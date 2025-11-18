@@ -1,5 +1,5 @@
 {
-  "name": "tmp-vite",
+  "name": "News Center",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "openai": "^6.9.0",
     "vue": "^3.5.24"
   },
   "devDependencies": {

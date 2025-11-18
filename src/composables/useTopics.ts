@@ -1,5 +1,5 @@
 import { readonly, ref, watch } from 'vue'
-import type { NewsArticle, Topic, TopicStatus, TopicUpdate } from '../types/topic'
+import type { Topic, TopicStatus, TopicUpdate } from '../types/topic'
 
 const STORAGE_KEY = 'news-center-topics'
 const hasWindow = typeof window !== 'undefined'
@@ -17,14 +17,23 @@ if (hasWindow) {
 }
 
 export function useTopics() {
-  const addTopic = (label: string, prompt: string) => {
+  const addTopic = (label: string, sources: string[] = []) => {
+    const normalizedSources = Array.from(
+      new Set(
+        sources
+          .map((source) => source.trim())
+          .filter((source): source is string => Boolean(source))
+      )
+    )
+
     const topic: Topic = {
       id: createId('topic'),
       label: label.trim(),
-      prompt: prompt.trim(),
       status: 'idle',
+      digEnabled: true,
+      sources: normalizedSources,
       lastRunAt: undefined,
-      articles: [],
+      response: undefined,
       errorMessage: undefined,
       createdAt: new Date().toISOString(),
     }
@@ -89,43 +98,26 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
   if (!candidate) return null
 
   const label = typeof candidate.label === 'string' ? candidate.label.trim() : ''
-  const prompt = typeof candidate.prompt === 'string' ? candidate.prompt.trim() : ''
-  if (!label || !prompt) return null
+  if (!label) return null
 
   const status: TopicStatus = candidate.status ?? 'idle'
-  const articles = Array.isArray(candidate.articles)
-    ? candidate.articles
-        .map((article) => normalizeArticle(article))
-        .filter((article): article is NewsArticle => article !== null)
+  const digEnabled =
+    typeof candidate.digEnabled === 'boolean' ? candidate.digEnabled : true
+  const sources = Array.isArray(candidate.sources)
+    ? candidate.sources
+        .map((source) => (typeof source === 'string' ? source.trim() : ''))
+        .filter((source): source is string => Boolean(source))
     : []
-
   return {
     id: typeof candidate.id === 'string' ? candidate.id : createId('topic'),
     label,
-    prompt,
     status,
+    digEnabled,
+    sources,
     lastRunAt: candidate.lastRunAt,
-    articles,
+    response: typeof candidate.response === 'string' ? candidate.response : undefined,
     errorMessage: candidate.errorMessage,
     createdAt: candidate.createdAt ?? new Date().toISOString(),
-  }
-}
-
-function normalizeArticle(candidate: Partial<NewsArticle> | null | undefined): NewsArticle | null {
-  if (!candidate) return null
-
-  const title = typeof candidate.title === 'string' ? candidate.title.trim() : ''
-  const url = typeof candidate.url === 'string' ? candidate.url : ''
-  if (!title || !url) return null
-
-  return {
-    id: typeof candidate.id === 'string' ? candidate.id : url,
-    title,
-    description: candidate.description ?? '',
-    publishedAt: candidate.publishedAt ?? new Date().toISOString(),
-    source: candidate.source ?? 'Unknown source',
-    url,
-    imageUrl: candidate.imageUrl,
   }
 }
 

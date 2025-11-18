@@ -1,79 +1,111 @@
-import type { NewsArticle } from '../types/topic'
+import OpenAI from 'openai'
 
-const API_URL = 'https://newsapi.org/v2/everything'
-const LOOKBACK_WINDOW_DAYS = 7 // grab articles from the last 7 calendar days
-const DEFAULT_PAGE_SIZE = 20
+const DEFAULT_MODEL = import.meta.env.VITE_OPENAI_MODEL || 'gpt-5'
+const CUSTOM_API_URL = import.meta.env.VITE_OPENAI_API_URL?.trim()
 
-interface NewsApiArticle {
-  title?: string
-  description?: string
-  url?: string
-  urlToImage?: string
-  publishedAt?: string
-  source?: {
-    id?: string | null
-    name?: string
-  }
-}
+let cachedClient: OpenAI | null = null
 
-interface NewsApiResponse {
-  status: 'ok' | 'error'
-  totalResults?: number
-  articles?: NewsApiArticle[]
-  code?: string
-  message?: string
-}
-
-export async function fetchNewsByPrompt(prompt: string): Promise<NewsArticle[]> {
-  const trimmedPrompt = prompt.trim()
-  if (!trimmedPrompt) {
-    throw new Error('Cannot query the News API with an empty prompt.')
+export async function fetchNewsForTopic(
+  topicLabel: string,
+  sources: readonly string[] = [],
+): Promise<string> {
+  const trimmedLabel = topicLabel.trim()
+  if (!trimmedLabel) {
+    throw new Error('Cannot query OpenAI with an empty topic name.')
   }
 
-  const apiKey = import.meta.env.VITE_NEWS_API_KEY ?? import.meta.env.NEWS_API_KEY
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY ?? import.meta.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error(
-      'Missing VITE_NEWS_API_KEY. Please add it to your .env file (Vite only exposes VITE_* variables).',
+      'Missing VITE_OPENAI_API_KEY. Please add it to your .env file (Vite only exposes VITE_* variables).',
     )
   }
 
-  const now = new Date()
-  const fromDate = new Date(now.getTime() - LOOKBACK_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+  const client = getOpenAiClient(apiKey)
+  const response = await client.responses.create({
+    model: DEFAULT_MODEL,
+    tools: [{ type: 'web_search' }],
+    instructions: buildPrompt(trimmedLabel, sources),
+    input: "Give only the answer",
+    reasoning: { effort: 'low', summary: 'detailed' },
+  })
+  console.log('OpenAI response for topic:', trimmedLabel, response)
 
-  const params = new URLSearchParams()
-  params.set('q', trimmedPrompt)
-  params.set('from', formatDate(fromDate))
-  params.set('to', formatDate(now))
-  params.set('sortBy', 'publishedAt')
-  params.set('language', 'en')
-  params.set('pageSize', DEFAULT_PAGE_SIZE.toString())
-  params.set('apiKey', apiKey)
-
-  const response = await fetch(`${API_URL}?${params.toString()}`)
-  const payload = (await response.json()) as NewsApiResponse
-
-  if (!response.ok || payload.status !== 'ok') {
-    throw new Error(payload.message ?? response.statusText ?? 'News API request failed.')
+  const summary = extractText(response)
+  if (!summary) {
+    throw new Error('OpenAI returned no content for this topic.')
   }
 
-  const sanitized: NewsArticle[] = []
-  for (const article of payload.articles ?? []) {
-    if (!article.url) continue
-    sanitized.push({
-      id: article.url,
-      title: article.title ?? 'Untitled',
-      description: article.description ?? '',
-      publishedAt: article.publishedAt ?? now.toISOString(),
-      source: article.source?.name ?? 'Unknown source',
-      url: article.url,
-      imageUrl: article.urlToImage ?? undefined,
-    })
-  }
-  return sanitized
+  return summary
 }
 
-function formatDate(date: Date): string {
-  const isoString = date.toISOString()
-  const datePart = isoString.split('T')[0]
-  return datePart ?? isoString
+function getOpenAiClient(apiKey: string) {
+  if (cachedClient) return cachedClient
+  cachedClient = new OpenAI({
+    apiKey,
+    baseURL: CUSTOM_API_URL || undefined,
+    dangerouslyAllowBrowser: true,
+  })
+  return cachedClient
+}
+
+function buildPrompt(topic: string, sources: readonly string[]): string {
+  const today = new Date().toISOString().split('T')[0]
+  const searchDirective = createSourceDirective(sources)
+  return [
+    `Today is ${today}. You are my personal news researcher.`,
+    `Use the web search tool to surface the most recent, reputable coverage about "${topic}".`,
+    searchDirective,
+    'Summarize the key developments from the past few days, highlight notable quotes or data points, and flag any emerging trends or risks.',
+    'Make sure the news is not more than 7 days old.',
+    'Return the answer with short paragraphs, prioritizing freshness and practical takeaways. Do not add additional text, just give ONLY the answer in less than 100 words',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+function createSourceDirective(sources: readonly string[]): string {
+  const cleanedSources = Array.from(sources)
+    .map((source) => source.trim())
+    .filter(Boolean)
+  if (!cleanedSources.length) return ''
+
+  return `Search on ${formatSourcesList(cleanedSources)}.`
+}
+
+function formatSourcesList(entries: string[]): string {
+  const list = entries.filter(Boolean)
+  if (list.length === 0) {
+    return ''
+  }
+
+  if (list.length === 1) {
+    return list[0]!
+  }
+
+  if (list.length === 2) {
+    return `${list[0]!} and ${list[1]!}`
+  }
+
+  const tail = list[list.length - 1]!
+  const head = list.slice(0, -1).join(', ')
+  return `${head} and ${tail}`
+}
+
+function extractText(payload: OpenAI.Responses.Response): string | null {
+  if (Array.isArray(payload.output_text) && payload.output_text.length > 0) {
+    return payload.output_text.join('\n').trim()
+  }
+
+  const segments: string[] = []
+  for (const block of payload.output ?? []) {
+    const contentItems = (block as { content?: Array<{ text?: string }> }).content ?? []
+    for (const content of contentItems) {
+      if (content?.text) {
+        segments.push(content.text)
+      }
+    }
+  }
+  const combined = segments.join('\n').trim()
+  return combined.length > 0 ? combined : null
 }
