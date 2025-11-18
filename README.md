@@ -1,6 +1,8 @@
-# News Center
+# Easy News
 
-Vue 3 app for saving custom news topics locally and digging up fresh OpenAI Responses summaries for each one. Every topic lives in `localStorage`, so reloading the page preserves your list.
+Easy News is a lightweight personal news desk that stores your recurring topics, pings OpenAI for ultra-fresh briefings, and keeps everything cached locally so your dashboard is ready the moment you open it.
+
+![Easy News preview](src/assets/easynews.png)
 
 ## Features
 

@@ -1,5 +1,5 @@
 import { readonly, ref, watch } from 'vue'
-import type { Topic, TopicStatus, TopicUpdate } from '../types/topic'
+import type { AnswerLength, Topic, TopicStatus, TopicUpdate } from '../types/topic'
 
 const STORAGE_KEY = 'news-center-topics'
 const hasWindow = typeof window !== 'undefined'
@@ -17,7 +17,11 @@ if (hasWindow) {
 }
 
 export function useTopics() {
-  const addTopic = (label: string, sources: string[] = []) => {
+  const addTopic = (
+    label: string,
+    sources: string[] = [],
+    answerLength: AnswerLength = 'medium'
+  ) => {
     const normalizedSources = Array.from(
       new Set(
         sources
@@ -32,6 +36,7 @@ export function useTopics() {
       status: 'idle',
       digEnabled: true,
       sources: normalizedSources,
+      answerLength,
       lastRunAt: undefined,
       response: undefined,
       errorMessage: undefined,
@@ -108,12 +113,17 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
         .map((source) => (typeof source === 'string' ? source.trim() : ''))
         .filter((source): source is string => Boolean(source))
     : []
+  const answerLength: AnswerLength =
+    candidate.answerLength === 'short' || candidate.answerLength === 'long'
+      ? candidate.answerLength
+      : 'medium'
   return {
     id: typeof candidate.id === 'string' ? candidate.id : createId('topic'),
     label,
     status,
     digEnabled,
     sources,
+    answerLength,
     lastRunAt: candidate.lastRunAt,
     response: typeof candidate.response === 'string' ? candidate.response : undefined,
     errorMessage: candidate.errorMessage,
