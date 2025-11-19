@@ -1,5 +1,5 @@
 {
-  "name": "Easy News",
+  "name": "EASYNEWS",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "dompurify": "^3.3.0",
+    "marked": "^12.0.2",
     "openai": "^6.9.0",
     "vue": "^3.5.24"
   },

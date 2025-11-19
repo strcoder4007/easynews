@@ -245,6 +245,23 @@ main.page {
   color: var(--text-primary);
 }
 
+.field-group input,
+.field-group select {
+  border-radius: 14px;
+  border: 1px solid rgba(5, 21, 15, 0.15);
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  background: #fffef9;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.field-group input:focus,
+.field-group select:focus {
+  outline: none;
+  border-color: var(--accent-end);
+  box-shadow: 0 0 0 3px rgba(0, 255, 163, 0.25);
+}
+
 .field-group.answer-length-group {
   border: none;
   padding: 0;
@@ -682,6 +699,12 @@ button.primary:not([disabled]):hover {
 
 .topic-last-run strong {
   color: var(--text-primary);
+}
+
+.topic-timeframe {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .pill-button {

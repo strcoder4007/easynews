@@ -1,8 +1,8 @@
-# Easy News
+# EASYNEWS
 
-Easy News is a lightweight personal news desk that stores your recurring topics, pings OpenAI for ultra-fresh briefings, and keeps everything cached locally so your dashboard is ready the moment you open it.
+EASYNEWS is a lightweight personal news desk that stores your recurring topics, pings OpenAI for ultra-fresh briefings, and keeps everything cached locally so your dashboard is ready the moment you open it.
 
-![Easy News preview](src/assets/easynews.png)
+![EASYNEWS preview](src/assets/easynews.png)
 
 ## Features
 

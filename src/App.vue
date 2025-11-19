@@ -13,6 +13,7 @@ const sourceInputRef = ref<HTMLInputElement | null>(null)
 const formError = ref<string | null>(null)
 const isDigging = ref(false)
 const answerLength = ref<AnswerLength>('medium')
+const timeframeDays = ref(7)
 const expandedTopicIds = ref<Set<string>>(new Set())
 const isTopicFormOpen = ref(false)
 const TOPIC_FORM_ID = 'topic-form-panel'
@@ -29,6 +30,7 @@ const editingSources = ref<string[]>([])
 const editingSourceInput = ref('')
 const editingSourceInputRef = ref<HTMLInputElement | null>(null)
 const editingAnswerLength = ref<AnswerLength>('medium')
+const editingTimeframeDays = ref(7)
 const editingError = ref<string | null>(null)
 
 const statusCopy: Record<TopicStatus, string> = {
@@ -101,11 +103,12 @@ const handleAddTopic = () => {
   }
 
   const sourcesToSave: string[] = [...newSources.value]
-  addTopic(name, sourcesToSave, answerLength.value)
+  addTopic(name, sourcesToSave, answerLength.value, sanitizeTimeframe(timeframeDays.value))
   topicName.value = ''
   sourceInput.value = ''
   newSources.value = []
   answerLength.value = 'medium'
+  timeframeDays.value = 7
 }
 
 const handleRemoveTopic = (id: string) => {
@@ -186,7 +189,8 @@ const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: bo
     const responseText = await fetchNewsForTopic(
       topic.label,
       topic.sources,
-      topic.answerLength
+      topic.answerLength,
+      topic.timeframeDays
     )
     updateTopic(topic.id, {
       status: 'success',
@@ -239,7 +243,7 @@ const handleCardClick = (topicId: string, event: MouseEvent) => {
   if (target?.closest('button, a, input, textarea, label')) {
     return
   }
-  toggleTopicCard(topicId)
+  ensureTopicExpanded(topicId)
 }
 
 const ensureTopicExpanded = (topicId: string) => {
@@ -256,6 +260,7 @@ const startEditingTopic = (topic: Topic | DeepReadonly<Topic>) => {
   editingTopicName.value = topic.label
   editingSources.value = [...topic.sources]
   editingAnswerLength.value = topic.answerLength
+  editingTimeframeDays.value = topic.timeframeDays
   editingSourceInput.value = ''
   editingError.value = null
 }
@@ -266,6 +271,7 @@ const cancelEditingTopic = () => {
   editingSources.value = []
   editingSourceInput.value = ''
   editingAnswerLength.value = 'medium'
+  editingTimeframeDays.value = 7
   editingError.value = null
 }
 
@@ -300,8 +306,14 @@ const saveEditingTopic = (topicId: string) => {
     label: name,
     sources: normalizedSources,
     answerLength: editingAnswerLength.value,
+    timeframeDays: sanitizeTimeframe(editingTimeframeDays.value),
   })
   cancelEditingTopic()
+}
+
+const sanitizeTimeframe = (value: number) => {
+  if (!Number.isFinite(value)) return 7
+  return Math.min(90, Math.max(1, Math.round(value)))
 }
 
 watch(
@@ -350,8 +362,8 @@ const formatResponse = (value: string) => {
 <template>
   <main class="page">
     <header class="page-header">
-      <div class="page-header__brand" aria-label="Easy News">
-        <p class="page-logo-text">EASY NEWS</p>
+      <div class="page-header__brand" aria-label="EASYNEWS">
+        <p class="page-logo-text">EASYNEWS</p>
       </div>
       <div class="page-header__actions">
         <button
@@ -438,6 +450,19 @@ const formatResponse = (value: string) => {
             </div>
           </fieldset>
 
+          <div class="field-group">
+            <label for="topic-timeframe">Look-back window (days)</label>
+            <input
+              id="topic-timeframe"
+              v-model.number="timeframeDays"
+              type="number"
+              min="1"
+              max="90"
+              step="1"
+              :disabled="isDigging"
+            />
+          </div>
+
           <div class="form-footer">
             <p v-if="formError" class="form-error">{{ formError }}</p>
             <button class="primary" type="submit" :disabled="!canAddTopic || isDigging">
@@ -475,6 +500,9 @@ const formatResponse = (value: string) => {
                 </span>
                 <p class="topic-last-run">
                   Last dig <strong>{{ formatDateTime(topic.lastRunAt) }}</strong>
+                </p>
+                <p class="topic-timeframe">
+                  Window: last {{ topic.timeframeDays }} day{{ topic.timeframeDays === 1 ? '' : 's' }}
                 </p>
               </div>
             </div>
@@ -594,6 +622,19 @@ const formatResponse = (value: string) => {
                       </label>
                     </div>
                   </fieldset>
+
+                  <div class="field-group">
+                    <label :for="`edit-topic-timeframe-${topic.id}`">Look-back window (days)</label>
+                    <input
+                      :id="`edit-topic-timeframe-${topic.id}`"
+                      v-model.number="editingTimeframeDays"
+                      type="number"
+                      min="1"
+                      max="90"
+                      step="1"
+                      :disabled="isDigging"
+                    />
+                  </div>
 
                   <p v-if="editingError" class="form-error">{{ editingError }}</p>
 

@@ -20,7 +20,8 @@ export function useTopics() {
   const addTopic = (
     label: string,
     sources: string[] = [],
-    answerLength: AnswerLength = 'medium'
+    answerLength: AnswerLength = 'medium',
+    timeframeDays = 7
   ) => {
     const normalizedSources = Array.from(
       new Set(
@@ -37,6 +38,7 @@ export function useTopics() {
       digEnabled: true,
       sources: normalizedSources,
       answerLength,
+      timeframeDays,
       lastRunAt: undefined,
       response: undefined,
       errorMessage: undefined,
@@ -117,6 +119,10 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
     candidate.answerLength === 'short' || candidate.answerLength === 'long'
       ? candidate.answerLength
       : 'medium'
+  const timeframeDays =
+    typeof candidate.timeframeDays === 'number' && Number.isFinite(candidate.timeframeDays)
+      ? candidate.timeframeDays
+      : 7
   return {
     id: typeof candidate.id === 'string' ? candidate.id : createId('topic'),
     label,
@@ -124,6 +130,7 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
     digEnabled,
     sources,
     answerLength,
+    timeframeDays,
     lastRunAt: candidate.lastRunAt,
     response: typeof candidate.response === 'string' ? candidate.response : undefined,
     errorMessage: candidate.errorMessage,

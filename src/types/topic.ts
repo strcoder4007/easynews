@@ -8,6 +8,7 @@ export interface Topic {
   digEnabled: boolean
   sources: string[]
   answerLength: AnswerLength
+  timeframeDays: number
   lastRunAt?: string
   response?: string
   errorMessage?: string
