@@ -4,6 +4,13 @@ import type { DeepReadonly } from 'vue'
 import { useTopics } from './composables/useTopics'
 import type { AnswerLength, Topic, TopicStatus } from './types/topic'
 import { fetchNewsForTopic } from './services/newsApi'
+import { getStoredApiKey, saveApiKey } from './services/apiKeyStore'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+marked.setOptions({
+  breaks: true,
+})
 const { topics, addTopic, removeTopic, updateTopic } = useTopics()
 
 const topicName = ref('')
@@ -17,11 +24,17 @@ const timeframeDays = ref(7)
 const expandedTopicIds = ref<Set<string>>(new Set())
 const isTopicFormOpen = ref(false)
 const TOPIC_FORM_ID = 'topic-form-panel'
+const isApiKeyFormOpen = ref(false)
+const API_KEY_FORM_ID = 'api-key-form-panel'
+const storedApiKey = ref<string | null>(getStoredApiKey())
+const apiKeyInput = ref('')
+const apiKeyFormError = ref<string | null>(null)
+const hasStoredApiKey = computed(() => Boolean(storedApiKey.value))
 
 const answerLengthOptions: Array<{ label: string; value: AnswerLength; helper: string }> = [
   { label: 'Short', value: 'short', helper: '< 30 words' },
   { label: 'Medium', value: 'medium', helper: '< 100 words' },
-  { label: 'Long', value: 'long', helper: '< 300 words' },
+  { label: 'Long', value: 'long', helper: '< 400 words' },
 ]
 
 const editingTopicId = ref<string | null>(null)
@@ -32,6 +45,22 @@ const editingSourceInputRef = ref<HTMLInputElement | null>(null)
 const editingAnswerLength = ref<AnswerLength>('medium')
 const editingTimeframeDays = ref(7)
 const editingError = ref<string | null>(null)
+const showZenModal = ref(false)
+
+const renderMarkdown = (value?: string) => {
+  if (!value) return ''
+  const html = marked.parse(value) as string
+  return DOMPurify.sanitize(html)
+}
+
+const openZenModal = () => {
+  if (!sortedTopics.value.length) return
+  showZenModal.value = true
+}
+
+const closeZenModal = () => {
+  showZenModal.value = false
+}
 
 const statusCopy: Record<TopicStatus, string> = {
   idle: 'Idle',
@@ -39,6 +68,15 @@ const statusCopy: Record<TopicStatus, string> = {
   success: 'Fetched',
   error: 'Error',
 }
+
+const sortedTopics = computed(() => {
+  return [...topics.value].sort((a, b) => {
+    if (a.timeframeDays === b.timeframeDays) {
+      return a.label.localeCompare(b.label)
+    }
+    return a.timeframeDays - b.timeframeDays
+  })
+})
 
 const canAddTopic = computed(() => {
   return Boolean(topicName.value.trim())
@@ -85,6 +123,19 @@ const handleSourceKeydown = (event: KeyboardEvent) => {
   }
 }
 
+const handleApiKeySubmit = () => {
+  apiKeyFormError.value = null
+  const candidate = apiKeyInput.value.trim()
+  if (!candidate) {
+    apiKeyFormError.value = 'Please enter a valid OpenAI API key.'
+    return
+  }
+  saveApiKey(candidate)
+  storedApiKey.value = candidate
+  apiKeyInput.value = ''
+  isApiKeyFormOpen.value = false
+}
+
 const handleAddTopic = () => {
   formError.value = null
   const name = topicName.value.trim()
@@ -109,6 +160,7 @@ const handleAddTopic = () => {
   newSources.value = []
   answerLength.value = 'medium'
   timeframeDays.value = 7
+  isTopicFormOpen.value = false
 }
 
 const handleRemoveTopic = (id: string) => {
@@ -186,15 +238,21 @@ const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: bo
   if (!options?.force && !topic.digEnabled) return
   updateTopic(topic.id, { status: 'fetching', errorMessage: undefined })
   try {
-    const responseText = await fetchNewsForTopic(
+    const { summary, prompt } = await fetchNewsForTopic(
       topic.label,
       topic.sources,
       topic.answerLength,
-      topic.timeframeDays
+      topic.timeframeDays,
+      {
+        onPromptReady: (craftedPrompt) => {
+          updateTopic(topic.id, { promptUsed: craftedPrompt })
+        },
+      }
     )
     updateTopic(topic.id, {
       status: 'success',
-      response: responseText,
+      response: summary,
+      promptUsed: prompt,
       lastRunAt: new Date().toISOString(),
       errorMessage: undefined,
     })
@@ -235,7 +293,20 @@ const toggleTopicCard = (topicId: string) => {
 const isTopicExpanded = (topicId: string) => expandedTopicIds.value.has(topicId)
 
 const toggleTopicForm = () => {
-  isTopicFormOpen.value = !isTopicFormOpen.value
+  const nextState = !isTopicFormOpen.value
+  isTopicFormOpen.value = nextState
+  if (nextState) {
+    isApiKeyFormOpen.value = false
+  }
+}
+
+const toggleApiKeyForm = () => {
+  apiKeyFormError.value = null
+  const nextState = !isApiKeyFormOpen.value
+  isApiKeyFormOpen.value = nextState
+  if (nextState) {
+    isTopicFormOpen.value = false
+  }
 }
 
 const handleCardClick = (topicId: string, event: MouseEvent) => {
@@ -342,21 +413,6 @@ const formatDateTime = (value?: string) => {
   }
 }
 
-const formatResponse = (value: string) => {
-  const escapeHtml = (input: string) =>
-    input
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;')
-
-  const linkified = escapeHtml(value).replace(
-    /(https?:\/\/[^\s)]+)(?=[\s)])/g,
-    '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>',
-  )
-  return linkified.replace(/\n/g, '<br />')
-}
 </script>
 
 <template>
@@ -369,18 +425,67 @@ const formatResponse = (value: string) => {
         <button
           class="add-topic-toggle"
           type="button"
+          :aria-controls="API_KEY_FORM_ID"
+          :aria-expanded="isApiKeyFormOpen"
+          title="Toggle the panel to add or update your OpenAI API key"
+          @click="toggleApiKeyForm"
+        >
+          <span class="header-accent-text">Add API Key</span>
+        </button>
+        <button
+          class="add-topic-toggle"
+          type="button"
           :aria-controls="TOPIC_FORM_ID"
           :aria-expanded="isTopicFormOpen"
           :disabled="isDigging"
+          title="Toggle the panel to add a new topic"
           @click="toggleTopicForm"
         >
-          <span>Add Topic</span>
+          <span class="header-accent-text">Add Topic</span>
         </button>
-        <button class="dig-button" :disabled="isDigDisabled" @click="digTopics">
+        <button
+          class="zen-button"
+          type="button"
+          :disabled="!sortedTopics.length"
+          title="Open Zen reading mode to review every summary"
+          @click="openZenModal"
+        >
+          <span class="header-accent-text">Zen Mode</span>
+        </button>
+        <button
+          class="dig-button"
+          :disabled="isDigDisabled"
+          title="Fetch fresh updates for all enabled topics"
+          @click="digTopics"
+        >
           <span>{{ isDigging ? 'DIGGING…' : 'DIG' }}</span>
         </button>
       </div>
     </header>
+
+    <Transition name="form-collapse">
+      <section v-if="isApiKeyFormOpen" class="card form-card" :id="API_KEY_FORM_ID">
+        <form class="topic-form api-key-form" @submit.prevent="handleApiKeySubmit">
+          <div class="field-group">
+            <label for="api-key-input">OpenAI API key</label>
+            <input
+              id="api-key-input"
+              v-model="apiKeyInput"
+              type="password"
+              placeholder="sk-..."
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="form-footer">
+            <p v-if="apiKeyFormError" class="form-error">{{ apiKeyFormError }}</p>
+            <p v-else-if="hasStoredApiKey" class="form-hint">Key saved to this browser.</p>
+            <button class="primary" type="submit">Add API KEY</button>
+          </div>
+        </form>
+      </section>
+    </Transition>
 
     <Transition name="form-collapse">
       <section v-if="isTopicFormOpen" class="card form-card" :id="TOPIC_FORM_ID">
@@ -404,13 +509,14 @@ const formatResponse = (value: string) => {
                 :key="`${source}-${index}`"
                 class="tag-chip"
               >
-                {{ source }}
-                <button
-                  type="button"
-                  class="tag-chip__remove"
-                  @click.stop="removeSourceAtIndex(index)"
-                  aria-label="Remove source"
-                >
+              {{ source }}
+              <button
+                type="button"
+                class="tag-chip__remove"
+                title="Remove this source"
+                @click.stop="removeSourceAtIndex(index)"
+                aria-label="Remove source"
+              >
                   &times;
                 </button>
               </span>
@@ -465,13 +571,22 @@ const formatResponse = (value: string) => {
 
           <div class="form-footer">
             <p v-if="formError" class="form-error">{{ formError }}</p>
-            <button class="primary" type="submit" :disabled="!canAddTopic || isDigging">
+            <button
+              class="primary"
+              type="submit"
+              :disabled="!canAddTopic || isDigging"
+              title="Save this topic"
+            >
               Add topic
             </button>
           </div>
         </form>
       </section>
     </Transition>
+
+    <div v-if="!hasStoredApiKey" class="api-key-warning" role="alert">
+      No OpenAI API key found. Click "Add API KEY" to enter one before digging.
+    </div>
 
     <section class="topics-section">
       <p v-if="topics.length === 0" class="empty-state">
@@ -480,7 +595,7 @@ const formatResponse = (value: string) => {
 
       <div v-else class="topic-grid">
         <article
-          v-for="topic in topics"
+          v-for="topic in sortedTopics"
           :key="topic.id"
           :class="[
             'card topic-card',
@@ -511,8 +626,8 @@ const formatResponse = (value: string) => {
                 class="topic-card__single-dig"
                 type="button"
                 :disabled="isDigging"
+                title="Fetch only this topic right now"
                 @click="handleDigTopicNow(topic.id)"
-                aria-label="Dig only this topic"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
@@ -531,6 +646,7 @@ const formatResponse = (value: string) => {
                   class="dig-switch__input"
                   type="checkbox"
                   :checked="topic.digEnabled"
+                  :title="topic.digEnabled ? 'Disable automatic digging' : 'Enable automatic digging'"
                   @change="handleDigToggle(topic.id, ($event.target as HTMLInputElement).checked)"
                 />
                 <span class="dig-switch__track" aria-hidden="true"></span>
@@ -539,6 +655,7 @@ const formatResponse = (value: string) => {
                 class="topic-card__expander"
                 type="button"
                 :aria-expanded="isTopicExpanded(topic.id)"
+                title="Expand topic details"
                 @click="toggleTopicCard(topic.id)"
               >
                 <span class="sr-only">
@@ -581,6 +698,7 @@ const formatResponse = (value: string) => {
                         <button
                           type="button"
                           class="tag-chip__remove"
+                          title="Remove this source"
                           @click.stop="removeEditingSourceAtIndex(index)"
                           aria-label="Remove source"
                         >
@@ -639,10 +757,11 @@ const formatResponse = (value: string) => {
                   <p v-if="editingError" class="form-error">{{ editingError }}</p>
 
                   <div class="topic-edit-actions">
-                    <button class="primary" type="submit">Save changes</button>
+                    <button class="primary" type="submit" title="Save these changes">Save changes</button>
                     <button
                       class="pill-button pill-button--muted"
                       type="button"
+                      title="Cancel editing"
                       @click="cancelEditingTopic"
                     >
                       Cancel
@@ -665,7 +784,12 @@ const formatResponse = (value: string) => {
                 </div>
 
                 <div class="topic-card__actions">
-                  <button class="pill-button" type="button" @click="startEditingTopic(topic)">
+                  <button
+                    class="pill-button"
+                    type="button"
+                    title="Edit topic details"
+                    @click="startEditingTopic(topic)"
+                  >
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path
                         fill="currentColor"
@@ -678,8 +802,8 @@ const formatResponse = (value: string) => {
                     class="pill-button pill-button--muted"
                     type="button"
                     :disabled="!topic.response"
+                    title="Clear saved response"
                     @click="handleClearResponse(topic.id)"
-                    aria-label="Clear response"
                   >
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path
@@ -693,8 +817,8 @@ const formatResponse = (value: string) => {
                     class="pill-button pill-button--danger"
                     type="button"
                     :disabled="isDigging"
+                    title="Delete topic"
                     @click="handleRemoveTopic(topic.id)"
-                    aria-label="Remove topic"
                   >
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path
@@ -713,8 +837,13 @@ const formatResponse = (value: string) => {
                   <p v-else-if="!topic.response">
                     No summary yet. Hit DIG to pull the most recent news.
                   </p>
-                  <div v-else class="topic-response" v-html="formatResponse(topic.response)"></div>
+                  <div v-else class="topic-response" v-html="renderMarkdown(topic.response)"></div>
                 </div>
+
+                <details class="prompt-used">
+                  <summary>Prompt Used</summary>
+                  <pre class="prompt-used__body">{{ topic.promptUsed ?? 'Prompt will appear here after the next dig.' }}</pre>
+                </details>
               </template>
             </div>
           </Transition>
@@ -722,4 +851,35 @@ const formatResponse = (value: string) => {
       </div>
     </section>
   </main>
+
+  <Transition name="zen-fade">
+    <div v-if="showZenModal" class="zen-modal-overlay" @click.self="closeZenModal">
+      <div class="zen-modal">
+        <header class="zen-modal__header">
+          <div>
+            <p class="zen-modal__eyebrow">Reading mode</p>
+            <h2>Zen Digest</h2>
+          </div>
+          <button class="pill-button" type="button" title="Close Zen mode" @click="closeZenModal">
+            Close
+          </button>
+        </header>
+        <div class="zen-modal__content">
+          <article v-for="topic in sortedTopics" :key="`zen-${topic.id}`" class="zen-entry">
+            <header class="zen-entry__header">
+              <p class="zen-entry__label">{{ topic.label }}</p>
+              <span class="zen-entry__window">Window: {{ topic.timeframeDays }} day{{ topic.timeframeDays === 1 ? '' : 's' }}</span>
+            </header>
+            <div v-if="topic.status === 'error'" class="zen-entry__message">
+              {{ topic.errorMessage ?? 'Unable to fetch news for this topic.' }}
+            </div>
+            <div v-else-if="!topic.response" class="zen-entry__message">
+              No summary yet. Hit DIG to pull the most recent news.
+            </div>
+            <div v-else class="zen-entry__body" v-html="renderMarkdown(topic.response)"></div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </Transition>
 </template>

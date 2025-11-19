@@ -39,6 +39,7 @@ export function useTopics() {
       sources: normalizedSources,
       answerLength,
       timeframeDays,
+      promptUsed: undefined,
       lastRunAt: undefined,
       response: undefined,
       errorMessage: undefined,
@@ -123,6 +124,8 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
     typeof candidate.timeframeDays === 'number' && Number.isFinite(candidate.timeframeDays)
       ? candidate.timeframeDays
       : 7
+  const promptUsed =
+    typeof candidate.promptUsed === 'string' ? candidate.promptUsed : undefined
   return {
     id: typeof candidate.id === 'string' ? candidate.id : createId('topic'),
     label,
@@ -131,6 +134,7 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
     sources,
     answerLength,
     timeframeDays,
+    promptUsed,
     lastRunAt: candidate.lastRunAt,
     response: typeof candidate.response === 'string' ? candidate.response : undefined,
     errorMessage: candidate.errorMessage,

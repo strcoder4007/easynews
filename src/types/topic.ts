@@ -9,6 +9,7 @@ export interface Topic {
   sources: string[]
   answerLength: AnswerLength
   timeframeDays: number
+  promptUsed?: string
   lastRunAt?: string
   response?: string
   errorMessage?: string

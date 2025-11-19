@@ -1,18 +1,19 @@
 # EASYNEWS
 
-EASYNEWS is a lightweight personal news desk that stores your recurring topics, pings OpenAI for ultra-fresh briefings, and keeps everything cached locally so your dashboard is ready the moment you open it.
+EASYNEWS is a lightweight personal news desk that keeps your recurring topics on deck, pings OpenAI for ultra-fresh briefings, and caches everything locally so your dashboard is ready the moment you open it.
 
-![EASYNEWS preview](src/assets/easynews.png)
+![EASYNEWS preview desktop](src/assets/easynews1.png)
+![EASYNEWS preview mobile](src/assets/easynews2.png)
 
-## Features
+## Highlights
 
-- Add unlimited topics by name (the label becomes the OpenAI query we send to the Responses API).
-- Persist topics + fetched summaries in `localStorage`; removing a topic clears its data.
-- Single `DIG` action covers every saved topic sequentially, prompting OpenAI for a concise summary per topic.
-- Live status badges (Idle, Fetching, Fetched, Error) plus last run timestamp and article counts per card.
-- Article cards include a generated title, publish date, and description with an outbound link for further reading.
+- Track unlimited topics—the label you type becomes the prompt sent to the OpenAI Responses API.
+- Persist topics *and* fetched summaries in the browser’s `localStorage`; removing a topic clears every trace.
+- A single **DIG** sweep fetches concise summaries for each enabled topic.
+- Cards show live state (Idle, Fetching, Fetched, Error), last run timestamp, and article counts.
+- Generated entries bundle a title, publish date, description, and outbound link for deeper reading.
 
-## Getting Started
+## Quick Start
 
 1. **Install dependencies**
 
@@ -20,14 +21,11 @@ EASYNEWS is a lightweight personal news desk that stores your recurring topics, 
    npm install
    ```
 
-2. **Create an environment file**
+2. **(Optional) Copy the env template** — only needed if you want to override defaults like the model or API URL.
 
    ```bash
    cp .env.example .env
    ```
-
-   - Set `VITE_OPENAI_API_KEY` (and optionally `OPENAI_API_KEY`) with your OpenAI key (https://platform.openai.com/api-keys). Vite only exposes variables that start with `VITE_`.
-   - Optionally override `VITE_OPENAI_MODEL` or `VITE_OPENAI_API_URL` if you want to use a different model or gateway.
 
 3. **Run the dev server**
 
@@ -35,13 +33,30 @@ EASYNEWS is a lightweight personal news desk that stores your recurring topics, 
    npm run dev
    ```
 
-   Visit the printed URL to start adding topics and dig for news.
+   Open the printed URL to start adding topics and digging for news.
 
-## Usage Tips
+4. **Build for production**
 
-- Enter a topic name, hit **Add topic** (or press Enter) to store it.
-- The **DIG** button iterates over every saved topic and refreshes the summary (one OpenAI-generated response per topic). Results are kept locally for reference, but every DIG run calls the OpenAI API.
-- Remove a topic via its card’s **Remove** action. This also deletes its saved summaries from `localStorage`.
+   ```bash
+   npm run build
+   ```
+
+   Outputs land in `dist/` via `vue-tsc -b && vite build`.
+
+## Configure OpenAI Access
+
+- Click **Add API KEY** in the app header, paste your OpenAI key (`sk-...`), and hit **Add API KEY**.
+- The key lives only in this browser’s `localStorage`; clearing storage or switching browsers requires re-entering it.
+- Environment variables are still supported for power users:
+  - `VITE_OPENAI_MODEL`, `VITE_OPENAI_MODEL_SMALL`, and `VITE_OPENAI_API_URL` let you point to alternate models/gateways.
+  - Note: the `.env` key values are no longer read inside the app—frontend input is the source of truth.
+
+## Workflow Tips
+
+- Enter a topic and press **Add Topic** (or hit Enter) to save it instantly.
+- **DIG** iterates over every enabled topic, calling OpenAI once per topic; cached responses remain visible until you clear them or remove the topic.
+- Use the card actions to remove a topic, toggle whether it participates in DIG runs, or clear the last response.
+- The Zen reading mode offers a distraction-free summary feed—open it via the **ZEN** button once you have summaries.
 
 ## Tech Stack
 
