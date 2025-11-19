@@ -458,7 +458,7 @@ const formatDateTime = (value?: string) => {
           title="Fetch fresh updates for all enabled topics"
           @click="digTopics"
         >
-          <span>{{ isDigging ? 'DIGGING…' : 'DIG' }}</span>
+          <span>{{ isDigging ? 'DIGGING…' : 'FIND NEWS' }}</span>
         </button>
       </div>
     </header>
@@ -496,7 +496,7 @@ const formatDateTime = (value?: string) => {
               id="topic-name"
               v-model="topicName"
               type="text"
-              placeholder="e.g. BMW Z4 new generation"
+              placeholder="e.g. PC FPS/RPG games that got cracked"
               :disabled="isDigging"
             />
           </div>
@@ -525,7 +525,7 @@ const formatDateTime = (value?: string) => {
                 ref="sourceInputRef"
                 v-model="sourceInput"
                 type="text"
-                placeholder="e.g. Reddit, TCB scans, TechCrunch"
+                placeholder="e.g. Reddit, r/crackwatch, TCB scans, TechCrunch"
                 :disabled="isDigging"
                 @keydown="handleSourceKeydown"
                 @blur="addSourceFromInput"
@@ -681,7 +681,7 @@ const formatDateTime = (value?: string) => {
                       :id="`edit-topic-${topic.id}`"
                       v-model="editingTopicName"
                       type="text"
-                      placeholder="e.g. BMW Z4 new generation"
+                      placeholder="e.g. PC FPS/RPG games that got cracked"
                       :disabled="isDigging"
                     />
                   </div>
@@ -710,7 +710,7 @@ const formatDateTime = (value?: string) => {
                         ref="editingSourceInputRef"
                         v-model="editingSourceInput"
                         type="text"
-                        placeholder="e.g. Reddit, TCB scans, TechCrunch"
+                        placeholder="e.g. Reddit, r/crackwatch, TCB scans, TechCrunch"
                         :disabled="isDigging"
                         @keydown="handleEditingSourceKeydown"
                         @blur="addEditingSourceFromInput"
@@ -857,11 +857,24 @@ const formatDateTime = (value?: string) => {
       <div class="zen-modal">
         <header class="zen-modal__header">
           <div>
-            <p class="zen-modal__eyebrow">Reading mode</p>
-            <h2>Zen Digest</h2>
+            <h2>Zen Mode</h2>
           </div>
-          <button class="pill-button" type="button" title="Close Zen mode" @click="closeZenModal">
-            Close
+          <button
+            class="zen-modal__close"
+            type="button"
+            title="Close Zen mode"
+            aria-label="Close Zen mode"
+            @click="closeZenModal"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M6 6l12 12M18 6l-12 12"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+            </svg>
           </button>
         </header>
         <div class="zen-modal__content">

@@ -1,80 +1,70 @@
 # EASYNEWS
 
-You can try the app by using your own OpenAI API key: https://strcoder4007.github.io/easynews/
+Live preview (use your own OpenAI API key): https://strcoder4007.github.io/easynews/
 
-EASYNEWS is a deep research agent that keeps every recurring topic on a swappable deck, digs for the freshest news on demand, and routes your prompts through a robust UI so you can steer the briefings with precise constraints while everything stays locally cached for instant recall.
+- Deep research agent with web access that keeps every topic on a swappable deck, digs for breaking coverage, and lets you steer the prompt with explicit constraints.
+- Works entirely in the browser—topics, prompts, and responses live in `localStorage`, so your desk opens instantly.
 
 ![EASYNEWS preview desktop](src/assets/easynews1.png)
 
-Keep all your news in one place, launch a DIG sweep for the latest findings, and let the app craft OpenAI prompts directly from your query plus any guardrails you set.
+Keep all your news updated and in one place
 
 ![EASYNEWS preview mobile](src/assets/easynews2.png)
 
-## Highlights
+## Core Capabilities
 
-- Track unlimited topics—the label you type becomes the prompt sent to the OpenAI Responses API.
-- Persist topics *and* fetched summaries in the browser’s `localStorage`; removing a topic clears every trace.
-- A single **DIG** sweep fetches concise summaries for each enabled topic.
-- Cards show live state (Idle, Fetching, Fetched, Error), last run timestamp, and article counts.
-- Generated entries bundle a title, publish date, description, and outbound link for deeper reading.
+- **Topic deck:** create unlimited topics, toggle them on/off, and reorder the list by editing timeframe windows.
+- **Guided digging:** the DIG action crafts an OpenAI prompt from your topic name + optional guardrails, then asks for recent web-sourced updates.
+- **Web-aware output:** responses include links, timestamps, and markdown copied straight into Zen Mode for distraction-free reading.
+- **Stateful cards:** each topic shows Idle/Fetching/Fetched/Error status, last run time, and quick actions for clearing, deleting, or editing.
+- **Zen Mode:** opens a minimal modal that strings all fetched summaries together for fast scan reading.
 
-## Quick Start
+## Requirements & Inputs
 
-1. **Install dependencies**
+- Node.js 18+ and npm.
+- An OpenAI API key with access to the Responses API (paste it via **Add API KEY** in the header).
+- Environment variables for default models:
 
-   ```bash
-   npm install
-   ```
+  ```bash
+  VITE_OPENAI_MODEL=gpt-5.1-2025-11-13
+  VITE_OPENAI_MODEL_SMALL=gpt-5-mini-2025-08-07
+  ```
 
-2. **(Optional) Copy the env template** — only needed if you want to override defaults like the model or API URL.
+## Setup
 
-   ```bash
-   cp .env.example .env
-   ```
+- Install dependencies:
 
-3. **Run the dev server**
+  ```bash
+  npm install
+  ```
 
-   ```bash
-   npm run dev
-   ```
+- (Optional) seed a config file:
 
-   Open the printed URL to start adding topics and digging for news.
+  ```bash
+  cp .env.example .env
+  ```
 
-4. **Build for production**
+- Run the dev server:
 
-   ```bash
-   npm run build
-   ```
+  ```bash
+  npm run dev
+  ```
 
-   Outputs land in `docs/` via `vue-tsc -b && vite build`.
+- Build the static site (outputs to `docs/` for GitHub Pages):
 
-## Environment Variables
+  ```bash
+  npm run build
+  ```
 
-Add these lines to your `.env` file so the client knows which OpenAI models to request:
+## Daily Flow
 
-```bash
-VITE_OPENAI_MODEL=gpt-5.1-2025-11-13
-VITE_OPENAI_MODEL_SMALL=gpt-5-mini-2025-08-07
-```
+- Enter a topic title (e.g., “AI policy in EU”) and hit **Add Topic**; the label becomes the research prompt.
+- Add per-topic sources or constraints, choose answer length + timeframe, and click **DIG** to fetch the latest summary.
+- Re-run DIG anytime; cached responses persist until you clear them or delete the topic.
+- Switch to **ZEN** to read every fetched summary without UI chrome.
 
-## Configure OpenAI Access
+## Tips
 
-- Click **Add API KEY** in the app header, paste your OpenAI key (`sk-...`), and hit **Add API KEY**.
-- The key lives only in this browser’s `localStorage`; clearing storage or switching browsers requires re-entering it.
-- Environment variables are still supported for power users:
-  - `VITE_OPENAI_MODEL`, `VITE_OPENAI_MODEL_SMALL`, and `VITE_OPENAI_API_URL` let you point to alternate models/gateways.
-  - Note: the `.env` key values are no longer read inside the app—frontend input is the source of truth.
-
-## Workflow Tips
-
-- Enter a topic and press **Add Topic** (or hit Enter) to save it instantly.
-- **DIG** iterates over every enabled topic, calling OpenAI once per topic; cached responses remain visible until you clear them or remove the topic.
-- Use the card actions to remove a topic, toggle whether it participates in DIG runs, or clear the last response.
-- The Zen reading mode offers a distraction-free summary feed—open it via the **ZEN** button once you have summaries.
-
-## Tech Stack
-
-- [Vue 3](https://vuejs.org/) with `<script setup>` + TypeScript
-- [Vite](https://vitejs.dev/) for tooling/bundling
-- Native `localStorage` for persistence
-- [OpenAI Responses API](https://platform.openai.com/docs/api-reference/responses) for topic summaries
+- You can maintain multiple topic decks; only enabled topics participate in DIG runs, so disable anything you want to pause.
+- Clearing a topic wipes both the cached response and the stored prompt so nothing stale is left behind.
+- Because everything is local storage, switching browsers or clearing site data requires re-entering the API key and topics.

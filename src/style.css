@@ -166,6 +166,9 @@ main.page {
   font-weight: 500;
   color: rgba(5, 26, 18, 0.8);
 }
+.dig-button span {
+  font-style: italic;
+}
 
 .add-topic-toggle {
   border-radius: 999px;
@@ -973,7 +976,8 @@ button.ghost[disabled] {
 .zen-modal {
   max-width: 960px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 95vh;
+  min-height: 75vh;
   background: rgba(255, 255, 255, 0.98);
   border-radius: 24px;
   border: 8px solid var(--accent-start);
@@ -987,8 +991,7 @@ button.ghost[disabled] {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.5rem 2rem 1rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 2rem 3rem 1.25rem;
 }
 
 .zen-modal__header h2 {
@@ -1005,18 +1008,47 @@ button.ghost[disabled] {
 }
 
 .zen-modal__content {
-  padding: 1.25rem 2rem 2rem;
+  padding: 2.5rem 3rem 3rem;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 2.5rem;
+}
+
+.zen-modal__close {
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #0f172a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.zen-modal__close svg {
+  width: 28px;
+  height: 28px;
+}
+
+.zen-modal__close:hover {
+  background: rgba(15, 23, 42, 0.07);
+  transform: scale(1.02);
+}
+
+.zen-modal__close:focus-visible {
+  outline: 2px solid var(--accent-start);
+  outline-offset: 2px;
 }
 
 .zen-entry {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
-  padding: 1rem 1.2rem;
-  background: rgba(248, 250, 252, 0.9);
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
 }
 
 .zen-entry__header {
@@ -1024,13 +1056,14 @@ button.ghost[disabled] {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 0.5rem;
-  margin-bottom: 0.7rem;
+  margin-bottom: 1.2rem;
 }
 
 .zen-entry__label {
   margin: 0;
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-weight: 800;
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  letter-spacing: -0.01em;
 }
 
 .zen-entry__window {
