@@ -440,7 +440,7 @@ main.page {
 
 button.primary {
   background: var(--accent-gradient);
-  color: #051a12;
+  color: #fff;
   border: none;
   border-radius: var(--button-radius);
   padding: var(--button-padding-y) var(--button-padding-x);
@@ -697,12 +697,26 @@ button.primary:not([disabled]):hover {
   justify-content: center;
   cursor: pointer;
   transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+  color: #fff;
 }
 
 .topic-card__single-dig svg {
   width: 14px;
   height: 14px;
-  color: #052e1e;
+  color: inherit;
+}
+
+.topic-card__single-dig--spinning svg {
+  animation: topic-dig-spin 1s linear infinite;
+}
+
+@keyframes topic-dig-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .topic-card__single-dig:disabled {
@@ -970,7 +984,7 @@ button.ghost[disabled] {
 }
 
 .zen-modal {
-  max-width: 960px;
+  max-width: 1150px;
   width: 100%;
   max-height: 95vh;
   min-height: 75vh;
@@ -1154,6 +1168,17 @@ button.ghost[disabled] {
     gap: 0.9rem;
   }
 
+  .page-header__brand {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .page-logo-text {
+    width: 100%;
+    text-align: center;
+    font-size: clamp(2.6rem, 13vw, 4rem);
+  }
+
   .page-header__actions {
     width: 100%;
     flex-direction: column;
@@ -1267,5 +1292,50 @@ button.ghost[disabled] {
   .topic-edit-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .zen-modal-overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .zen-modal {
+    border-radius: 0;
+    max-width: none;
+    width: 100vw;
+    min-height: 100vh;
+    max-height: none;
+  }
+
+  .zen-modal::before {
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .zen-modal__header {
+    padding: 1.5rem 1.5rem 1rem;
+  }
+
+  .zen-modal__header h2 {
+    font-size: 1.2rem;
+  }
+
+  .zen-modal__content {
+    padding: 1rem 1.5rem 2rem;
+    gap: 1.5rem;
+  }
+
+  .zen-entry__label {
+    font-size: 1.1rem;
+  }
+
+  .zen-entry__body {
+    font-size: 0.85rem;
+    line-height: 1.45;
+  }
+
+  .zen-entry__window,
+  .zen-entry__message {
+    font-size: 0.75rem;
   }
 }

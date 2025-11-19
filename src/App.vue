@@ -54,7 +54,7 @@ const renderMarkdown = (value?: string) => {
 }
 
 const openZenModal = () => {
-  if (!sortedTopics.value.length) return
+  if (!zenTopics.value.length) return
   showZenModal.value = true
 }
 
@@ -75,6 +75,13 @@ const sortedTopics = computed(() => {
       return a.label.localeCompare(b.label)
     }
     return a.timeframeDays - b.timeframeDays
+  })
+})
+
+const zenTopics = computed(() => {
+  return sortedTopics.value.filter((topic) => {
+    const response = topic.response
+    return typeof response === 'string' && response.trim().length > 0
   })
 })
 
@@ -401,6 +408,12 @@ watch(
   { deep: false }
 )
 
+watch(zenTopics, (next) => {
+  if (!next.length) {
+    showZenModal.value = false
+  }
+})
+
 const formatDateTime = (value?: string) => {
   if (!value) return 'Never'
   try {
@@ -446,7 +459,7 @@ const formatDateTime = (value?: string) => {
         <button
           class="zen-button"
           type="button"
-          :disabled="!sortedTopics.length"
+          :disabled="!zenTopics.length"
           title="Open Zen reading mode to review every summary"
           @click="openZenModal"
         >
@@ -623,7 +636,10 @@ const formatDateTime = (value?: string) => {
             </div>
             <div class="topic-card__header-actions">
               <button
-                class="topic-card__single-dig"
+                :class="[
+                  'topic-card__single-dig',
+                  { 'topic-card__single-dig--spinning': topic.status === 'fetching' },
+                ]"
                 type="button"
                 :disabled="isDigging"
                 title="Fetch only this topic right now"
@@ -633,7 +649,7 @@ const formatDateTime = (value?: string) => {
                   <path
                     d="M16.023 9.348h4.992V4.356m-1.743 2.449A9.295 9.295 0 009.184 3.067 9.28 9.28 0 003 9.75m4.977 4.545H3v4.992m1.743-2.449a9.295 9.295 0 009.088 3.738 9.28 9.28 0 006.44-4.786"
                     fill="none"
-                    stroke="white"
+                    stroke="currentColor"
                     stroke-width="1.8"
                     stroke-linecap="round"
                     stroke-linejoin="round"
@@ -878,7 +894,7 @@ const formatDateTime = (value?: string) => {
           </button>
         </header>
         <div class="zen-modal__content">
-          <article v-for="topic in sortedTopics" :key="`zen-${topic.id}`" class="zen-entry">
+          <article v-for="topic in zenTopics" :key="`zen-${topic.id}`" class="zen-entry">
             <header class="zen-entry__header">
               <p class="zen-entry__label">{{ topic.label }}</p>
               <span class="zen-entry__window">Window: {{ topic.timeframeDays }} day{{ topic.timeframeDays === 1 ? '' : 's' }}</span>
