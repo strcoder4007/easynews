@@ -1,8 +1,13 @@
 # EASYNEWS
 
-EASYNEWS is a lightweight personal news desk that keeps your recurring topics on deck, pings OpenAI for ultra-fresh briefings, and caches everything locally so your dashboard is ready the moment you open it.
+You can try the app by using your own OpenAI API key: https://strcoder4007.github.io/easynews/
+
+EASYNEWS is a deep research agent that keeps every recurring topic on a swappable deck, digs for the freshest news on demand, and routes your prompts through a robust UI so you can steer the briefings with precise constraints while everything stays locally cached for instant recall.
 
 ![EASYNEWS preview desktop](src/assets/easynews1.png)
+
+Keep all your news in one place, launch a DIG sweep for the latest findings, and let the app craft OpenAI prompts directly from your query plus any guardrails you set.
+
 ![EASYNEWS preview mobile](src/assets/easynews2.png)
 
 ## Highlights
@@ -41,7 +46,16 @@ EASYNEWS is a lightweight personal news desk that keeps your recurring topics on
    npm run build
    ```
 
-   Outputs land in `dist/` via `vue-tsc -b && vite build`.
+   Outputs land in `docs/` via `vue-tsc -b && vite build`.
+
+## Environment Variables
+
+Add these lines to your `.env` file so the client knows which OpenAI models to request:
+
+```bash
+VITE_OPENAI_MODEL=gpt-5.1-2025-11-13
+VITE_OPENAI_MODEL_SMALL=gpt-5-mini-2025-08-07
+```
 
 ## Configure OpenAI Access
 
