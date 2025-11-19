@@ -126,7 +126,7 @@ async function craftTopicPrompt(
         'Use the GPT-5.1 prompting guide in the input: isolate each requirement with the tag system (<final_answer_formatting>, <output_verbosity_spec>, <solution_persistence>, etc.) so downstream execution is reliable.',
         'Return only the finished prompt—no analysis, labels, or fences.',
         'The prompt must: demand the freshest coverage, call out explicit sources, describe the Markdown format (bold lead, tight bullets, forward-looking closer), and enforce the requested answer length.',
-        'When the user provides no preferred sources, propose credible outlets yourself and include them in the prompt.',
+        'User provides preferred sources or not, you should propose relevant and credible outlets yourself and include them in the prompt.',
       ].join('\n'),
       input: [
         `Today's Date: ${today}`,
