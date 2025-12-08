@@ -388,8 +388,18 @@ main.page {
 }
 
 .theme-toggle__icon {
-  font-size: 1rem;
-  line-height: 1;
+  width: 28px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 .header-accent-text {
   background: var(--accent-gradient);
@@ -661,6 +671,27 @@ button.primary:not([disabled]):hover {
   box-shadow: var(--topic-card-shadow-hover);
 }
 
+.topic-card--fetching {
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+.topic-card--fetching::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 10%,
+    rgba(255, 255, 255, 0.4) 35%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  animation: topic-card-shimmer 1.3s linear infinite;
+  opacity: 0.9;
+  z-index: 0;
+  pointer-events: none;
+}
+
 .topic-card--collapsed {
   padding-bottom: 1rem;
 }
@@ -865,6 +896,15 @@ button.primary:not([disabled]):hover {
 
 .topic-card__single-dig:not(:disabled):hover {
   transform: translateY(-1px);
+}
+
+@keyframes topic-card-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 .status-pill {

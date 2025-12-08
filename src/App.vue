@@ -7,6 +7,8 @@ import { fetchNewsForTopic } from './services/newsApi'
 import { getStoredApiKey, saveApiKey } from './services/apiKeyStore'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import yodaIcon from './assets/yoda.png'
+import vaderIcon from './assets/vader.png'
 
 marked.setOptions({
   breaks: true,
@@ -55,13 +57,10 @@ const getStoredThemePreference = (): ThemeMode | null => {
 }
 
 const resolveInitialTheme = (): ThemeMode => {
-  if (typeof window === 'undefined') return 'light'
+  if (typeof window === 'undefined') return 'dark'
   const stored = getStoredThemePreference()
   if (stored) return stored
-  const prefersDark = typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-color-scheme: dark)').matches
-    : false
-  return prefersDark ? 'dark' : 'light'
+  return 'dark'
 }
 
 const applyThemeToDocument = (mode: ThemeMode) => {
@@ -71,10 +70,10 @@ const applyThemeToDocument = (mode: ThemeMode) => {
 
 const theme = ref<ThemeMode>(resolveInitialTheme())
 const isDarkTheme = computed(() => theme.value === 'dark')
-const nextThemeLabel = computed(() => (isDarkTheme.value ? 'Light Mode' : 'Dark Mode'))
 const themeToggleDescription = computed(() =>
   isDarkTheme.value ? 'Switch to light mode' : 'Switch to dark mode'
 )
+const themeToggleIcon = computed(() => (isDarkTheme.value ? yodaIcon : vaderIcon))
 
 watch(
   theme,
@@ -126,6 +125,7 @@ const sortedTopics = computed(() => {
 
 const zenTopics = computed(() => {
   return sortedTopics.value.filter((topic) => {
+    if (!topic.digEnabled) return false
     const response = topic.response
     return typeof response === 'string' && response.trim().length > 0
   })
@@ -491,7 +491,7 @@ const formatDateTime = (value?: string) => {
           @click="toggleTheme"
         >
           <span class="theme-toggle__icon" aria-hidden="true">
-            {{ isDarkTheme ? '🌙' : '☀️' }}
+            <img :src="themeToggleIcon" alt="" />
           </span>
         </button>
         <button
@@ -674,6 +674,7 @@ const formatDateTime = (value?: string) => {
             {
               'topic-card--collapsed': !isTopicExpanded(topic.id),
               'topic-card--expanded': isTopicExpanded(topic.id),
+              'topic-card--fetching': topic.status === 'fetching',
             },
           ]"
           @click="handleCardClick(topic.id, $event)"
