@@ -45,6 +45,52 @@ const editingSourceInputRef = ref<HTMLInputElement | null>(null)
 const editingAnswerLength = ref<AnswerLength>('medium')
 const editingTimeframeDays = ref(7)
 const editingError = ref<string | null>(null)
+type ThemeMode = 'light' | 'dark'
+const THEME_STORAGE_KEY = 'easynews:theme'
+
+const getStoredThemePreference = (): ThemeMode | null => {
+  if (typeof window === 'undefined') return null
+  const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+  return stored === 'light' || stored === 'dark' ? stored : null
+}
+
+const resolveInitialTheme = (): ThemeMode => {
+  if (typeof window === 'undefined') return 'light'
+  const stored = getStoredThemePreference()
+  if (stored) return stored
+  const prefersDark = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)').matches
+    : false
+  return prefersDark ? 'dark' : 'light'
+}
+
+const applyThemeToDocument = (mode: ThemeMode) => {
+  if (typeof document === 'undefined') return
+  document.documentElement.dataset.theme = mode
+}
+
+const theme = ref<ThemeMode>(resolveInitialTheme())
+const isDarkTheme = computed(() => theme.value === 'dark')
+const nextThemeLabel = computed(() => (isDarkTheme.value ? 'Light Mode' : 'Dark Mode'))
+const themeToggleDescription = computed(() =>
+  isDarkTheme.value ? 'Switch to light mode' : 'Switch to dark mode'
+)
+
+watch(
+  theme,
+  (next) => {
+    applyThemeToDocument(next)
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(THEME_STORAGE_KEY, next)
+    }
+  },
+  { immediate: true }
+)
+
+const toggleTheme = () => {
+  theme.value = isDarkTheme.value ? 'light' : 'dark'
+}
+
 const showZenModal = ref(false)
 
 const renderMarkdown = (value?: string) => {
@@ -435,6 +481,19 @@ const formatDateTime = (value?: string) => {
         <p class="page-logo-text">EASYNEWS</p>
       </div>
       <div class="page-header__actions">
+        <button
+          class="theme-toggle"
+          type="button"
+          role="switch"
+          :aria-checked="isDarkTheme"
+          :aria-label="themeToggleDescription"
+          :title="themeToggleDescription"
+          @click="toggleTheme"
+        >
+          <span class="theme-toggle__icon" aria-hidden="true">
+            {{ isDarkTheme ? '🌙' : '☀️' }}
+          </span>
+        </button>
         <button
           class="add-topic-toggle"
           type="button"
