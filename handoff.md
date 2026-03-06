@@ -19,7 +19,8 @@
 |-------|------------|
 | **Framework** | Vite + React |
 | **Build** | TypeScript |
-| **AI** | OpenAI Responses API |
+| **AI** | Google Gemini 2.0 Flash (via @google/generative-ai) |
+| **Search** | Google Search via Serper API |
 | **Storage** | localStorage (browser) |
 | **Styling** | (check src/) |
 
@@ -47,7 +48,7 @@ news-center/
 ```bash
 cd ~/Projects/news-center
 npm install
-cp .env.example .env     # Optional
+cp .env.example .env     # Optional (already has keys configured)
 npm run dev
 ```
 
@@ -55,15 +56,16 @@ Access: http://localhost:5173 (default Vite port)
 
 ### Environment Variables
 ```
-VITE_OPENAI_MODEL=gpt-5.1-2025-11-13
-VITE_OPENAI_MODEL_SMALL=gpt-5-mini-2025-08-07
+VITE_GEMINI_MODEL=gemini-2.0-flash-exp
+VITE_SERPER_API_KEY=your_serper_api_key_here
 ```
 
 ---
 
 ## 5. Configuration
 
-- User provides OpenAI API key via UI ("Add API KEY" in header)
+- User provides Gemini API key via UI ("Add API KEY" in header)
+- Serper API key is configured via .env (for server-side search)
 - All state persisted to browser localStorage
 - No backend required - runs entirely client-side
 
@@ -71,17 +73,28 @@ VITE_OPENAI_MODEL_SMALL=gpt-5-mini-2025-08-07
 
 ## 6. Known Issues
 
-- Requires OpenAI API key with Responses API access
-- Live preview at strcoder4007.github.io/easynews/ may have rate limits
+- Requires Gemini API key
+- Search uses Serper API (configured in .env)
 
 ---
 
 ## 7. What a New Agent Needs to Know
 
 - Main logic in `src/` - check components for UI, services for AI calls
-- OpenAI integration uses the Responses API (not standard Chat Completions)
+- Gemini integration uses @google/generative-ai SDK
+- Search is performed via Serper API (Google search)
 - State management via localStorage - no database needed
 
 ---
 
+## 8. Migration Notes (March 2026)
+
+- Migrated from OpenAI Responses API to Gemini 2.0 Flash
+- Replaced OpenAI web_search tool with Serper API for Google search
+- API key storage remains in localStorage (user-provided)
+- Serper key is configured in .env file
+
+---
+
 *Generated: February 21, 2026*
+*Updated: March 6, 2026*

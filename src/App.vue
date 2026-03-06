@@ -180,7 +180,7 @@ const handleApiKeySubmit = () => {
   apiKeyFormError.value = null
   const candidate = apiKeyInput.value.trim()
   if (!candidate) {
-    apiKeyFormError.value = 'Please enter a valid OpenAI API key.'
+    apiKeyFormError.value = 'Please enter a valid Gemini API key.'
     return
   }
   saveApiKey(candidate)
@@ -499,7 +499,7 @@ const formatDateTime = (value?: string) => {
           type="button"
           :aria-controls="API_KEY_FORM_ID"
           :aria-expanded="isApiKeyFormOpen"
-          title="Toggle the panel to add or update your OpenAI API key"
+          title="Toggle the panel to add or update your Gemini API key"
           @click="toggleApiKeyForm"
         >
           <span class="header-accent-text">Add API Key</span>
@@ -539,7 +539,7 @@ const formatDateTime = (value?: string) => {
       <section v-if="isApiKeyFormOpen" class="card form-card" :id="API_KEY_FORM_ID">
         <form class="topic-form api-key-form" @submit.prevent="handleApiKeySubmit">
           <div class="field-group">
-            <label for="api-key-input">OpenAI API key</label>
+            <label for="api-key-input">Gemini API key</label>
             <input
               id="api-key-input"
               v-model="apiKeyInput"
@@ -657,7 +657,7 @@ const formatDateTime = (value?: string) => {
     </Transition>
 
     <div v-if="!hasStoredApiKey" class="api-key-warning" role="alert">
-      No OpenAI API key found. Click "Add API KEY" to enter one before digging.
+      No Gemini API key found. Click "Add API KEY" to enter one before digging.
     </div>
 
     <section class="topics-section">
