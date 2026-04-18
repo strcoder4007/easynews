@@ -80,24 +80,18 @@ async function layer2_search(
   // Execute all queries directly via Serper — no model tool execution needed
   const results = await searchMultipleSerper(queries, timeframeDays)
 
-  // Client-side date guard: filter out articles older than the time window
-  const cutoff = new Date()
-  cutoff.setDate(cutoff.getDate() - timeframeDays)
-
-  return results
-    .map((r) => ({
-      title: r.title,
-      source: r.source,
-      url: r.url,
-      date: r.date,
-      snippet: r.snippet,
-      relevance: 0.8,
-    }))
-    .filter((r) => {
-      if (!r.date) return true // keep results without dates (trust Serper's tbs filter)
-      const articleDate = new Date(r.date)
-      return articleDate >= cutoff
-    })
+  // searchMultipleSerper already applies date filtering via parseRelativeDate.
+  // Do NOT apply a second filter with new Date(r.date) — Serper returns relative
+  // date strings like "3 days ago" which new Date() cannot parse (returns Invalid Date),
+  // causing every dated article to be silently dropped.
+  return results.map((r) => ({
+    title: r.title,
+    source: r.source,
+    url: r.url,
+    date: r.date,
+    snippet: r.snippet,
+    relevance: 0.8,
+  }))
 }
 
 // ---------------------------------------------------------------------------

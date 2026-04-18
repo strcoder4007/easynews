@@ -1,74 +1,217 @@
-# Easynews — Project Handoff
+# News Center — Architecture & Handoff
 
-## What Exists
+## Overview
 
-A browser-based news intelligence app with a topic deck, 3-layer research pipeline, token tracking, and zen mode.
+News Center is a Vue 3 + TypeScript single-page app that researches news topics across the web using a 3-layer Gemini-powered pipeline, then renders structured briefs. Deployed to GitHub Pages at `/easynews/`.
 
-## Architecture (Implemented)
+---
 
-### 3-Layer Pipeline
+## Architecture
 
-**Layer 1 — Topic Intelligence** (`src/services/researchPipeline.ts → layer1_analyzeTopic`)
-- Model: `gemini-3-flash-preview` with `ThinkingLevel.MEDIUM`
-- Input: topic label + preferred sources + timeframe days
-- Output: `{ classification, angle, suggestedQueries[3], responseStyle, priorityFactors[2] }`
-- JSON response via `responseMimeType: 'application/json'`
-- Returns token usage metadata
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         App.vue                             │
+│  digSingleTopic() → fetchNewsForTopic()                      │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│                    newsApi.ts                                │
+│  fetchNewsForTopic() → runResearchPipeline()                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+┌─────────────────────▼───────────────────────────────────────┐
+│               researchPipeline.ts                             │
+│                                                             │
+│  Layer 1 ──► Gemini Flash ──────────────────► classify +     │
+│             (gemini-3-flash-preview)     suggestedQueries    │
+│                                          ↓                  │
+│  Layer 2 ──► Serper REST API ────────────► SourceArticle[]   │
+│             (google.serper.dev/search)                      │
+│                                          ↓                  │
+│  Layer 3 ──► Gemini Pro ─────────────────► ResearchResult   │
+│             (gemini-3.1-pro-preview)      → Markdown         │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**Layer 2 — Source-Diversified Search** (`researchPipeline.ts → layer2_search`)
-- Calls `searchService.ts` which uses **Serper REST API** directly (not model tool execution)
-- Runs 3 queries in parallel via `Promise.all`
-- Serper `tbs` date filter maps timeframeDays to Google date ranges (`qdr:d/w/m/y`)
-- Client-side date guard also filters results older than the time window
-- Deduplicates by URL
+### Layer 1 — Topic Intelligence (analyze)
+- **Model**: `gemini-3-flash-preview` with `ThinkingLevel.MEDIUM`
+- **Input**: topic label + preferred sources + timeframe
+- **Output**: `Layer1Intelligence` — classification, angle, 3 `suggestedQueries`, responseStyle, priorityFactors
+- **Prompt**: structured JSON only, no markdown fences
 
-**Layer 3 — Structured Synthesis** (`researchPipeline.ts → layer3_synthesize`)
-- Model: `gemini-3.1-pro-preview` with `ThinkingLevel.HIGH`
-- Input: all gathered articles (up to 15) + layer 1 intelligence
-- Output: structured JSON `{ headline, classification, angle, coverage: {primary,secondary,niche}, keyFindings, implications, whatToWatch, sourceDiversityScore }`
+### Layer 2 — Source-Diversified Search (search)
+- **No model tool calls** — Serper REST API called directly for reliable results
+- `searchMultipleSerper(queries, timeframeDays)` fires all 3 queries in parallel
+- Serper returns `tbs: qdr:w/m/y` based on timeframe
+- Results deduplicated by URL, client-side date filtering via `parseRelativeDate` (handles "3 days ago" etc.)
+- Returns `SourceArticle[]`
+
+### Layer 3 — Structured Synthesis (synthesize)
+- **Model**: `gemini-3.1-pro-preview` with `ThinkingLevel.HIGH`
+- **Input**: topic + intelligence + up to 15 articles
+- **Output**: `ResearchResult` — headline, coverage (primary/secondary/niche), keyFindings, implications, whatToWatch
 - Rendered as Markdown via `renderResearchAsMarkdown()`
-- Returns token usage metadata
 
-**Token Usage**: Layers 1 and 3 both return `usageMetadata { promptTokenCount, candidatesTokenCount, totalTokenCount }`. Aggregated in `runResearchPipeline()` and displayed in the UI card as `Tokens: X (Y in / Z out)`.
+---
 
-### Status States
+## Services
 
-`idle | analyzing | searching | synthesizing | success | error`
+| File | Responsibility |
+|------|---------------|
+| `researchPipeline.ts` | 3-layer orchestration, pipeline entry point, markdown renderer |
+| `searchService.ts` | Serper REST calls, URL dedup, relative date parsing |
+| `newsApi.ts` | Thin wrapper around pipeline |
+| `geminiClient.ts` | `GoogleGenAI` client factory |
+| `apiKeyStore.ts` | Gemini API key localStorage CRUD |
 
-Card shows status pill + "Layer N/3" progress indicator when in flight.
+---
 
-## File Map
+## State Management
 
-| File | Purpose |
-|------|---------|
-| `src/types/research.ts` | `ResearchResult`, `Layer1Intelligence`, `SourceArticle`, `KeyFinding`, `TokenUsage` |
-| `src/types/topic.ts` | `Topic`, `TopicStatus`, `AnswerLength` |
-| `src/services/geminiClient.ts` | `GoogleGenAI` client factory |
-| `src/services/researchPipeline.ts` | Layers 1-3 + `runResearchPipeline()` |
-| `src/services/searchService.ts` | Serper REST client, date filtering via `tbs` |
-| `src/services/newsApi.ts` | `fetchNewsForTopic()` — wraps pipeline, returns summary + tokenUsage |
-| `src/services/apiKeyStore.ts` | localStorage read/write for Gemini API key |
-| `src/composables/useTopics.ts` | Topics CRUD + localStorage persistence |
-| `src/App.vue` | UI, topic management, dig orchestration |
-| `src/style.css` | All styles, CSS custom properties for light/dark themes |
+`useTopics.ts` composable:
+- Module-level singleton `topics ref` — shared across entire app
+- Persists to `localStorage` key `news-center-topics`
+- Exports `topics`, `addTopic`, `removeTopic`, `updateTopic`, `mergeTopics`, `exportTopics`
+
+**Topic lifecycle:**
+```
+idle → analyzing → searching → synthesizing → success
+                                         → error
+```
+
+---
+
+## Types
+
+### Topic (`types/topic.ts`)
+```typescript
+interface Topic {
+  id: string
+  label: string
+  status: TopicStatus          // 'idle'|'analyzing'|'searching'|'synthesizing'|'success'|'error'
+  digEnabled: boolean
+  sources: string[]
+  answerLength: AnswerLength   // 'short'|'medium'|'long'
+  timeframeDays: number
+  lastRunAt?: string
+  response?: string            // rendered markdown
+  errorMessage?: string
+  createdAt: string
+  layerProgress?: 1|2|3
+  tokenUsage?: TokenUsage
+}
+```
+
+### ResearchResult (`types/research.ts`)
+```typescript
+interface ResearchResult {
+  classification: TopicClassification
+  angle: string
+  headline: string
+  coverage: { primary: SourceArticle[]; secondary: SourceArticle[]; niche: SourceArticle[] }
+  keyFindings: KeyFinding[]
+  implications: string[]
+  whatToWatch: string
+  sourceDiversityScore: number
+  searchQueriesUsed: string[]
+  rawSearchResults: SourceArticle[]
+}
+
+interface Layer1Intelligence {
+  classification: TopicClassification
+  angle: string
+  suggestedQueries: string[]    // exactly 3
+  responseStyle: 'breaking'|'summary'|'detailed'|'opinion'
+  priorityFactors: string[]
+}
+```
+
+---
 
 ## API Keys
 
-- **Serper**: `VITE_SERPER_API_KEY` in `.env` — for Layer 2 search
-- **Gemini**: User-entered via "Add API KEY" panel → stored in localStorage as `'news-center-api-key'`
-- Both `.env` vars are build-time injected (Vite)
+### Gemini
+- **Storage**: localStorage key `news-center-api-key`
+- **Input**: via "Add API KEY" panel in UI → `saveApiKey()`
+- **Access**: `getStoredApiKey()` from `apiKeyStore.ts`
+- **Used by**: Layer 1 and Layer 3 Gemini calls
 
-## Build
+### Serper
+- **Storage**: bundled at build time via `VITE_SERPER_API_KEY` in `.env`
+- **Access**: `import.meta.env.VITE_SERPER_API_KEY` in `searchService.ts`
+- **Value**: `29e9856df645a3ac5c5bcb6bdad3e582be0322fa`
+- **Used by**: Layer 2 search (direct REST, no model)
 
-```bash
-cd /Users/str/Projects/news-center
-pnpm build  # clean build → docs/
+---
+
+## Build & Deploy
+
+- **Framework**: Vite + Vue 3 + TypeScript (`vue-tsc -b`)
+- **Output dir**: `docs/` (configured for GitHub Pages)
+- **Base path**: `/easynews/`
+- **Build**: `npm run build` → `docs/assets/index-*.js` + `docs/index.html`
+- **Dev**: `npm run dev`
+
+---
+
+## Known Bugs Fixed
+
+### "No search results found" (fixed 2026-04-18)
+**Root cause**: Double date filtering in `layer2_search`.
+
+`searchMultipleSerper` already filters via `parseRelativeDate` (correctly parses relative strings like "3 days ago"). But `layer2_search` applied a **second** `.filter()` using `new Date(r.date)`. Serper returns relative date strings, and `new Date("3 days ago")` returns `Invalid Date`, which always fails `>= cutoff` — silently dropping every article with a date.
+
+**Fix**: Removed the broken second filter from `layer2_search`. It now just maps results to `SourceArticle` format and passes them up.
+
+```typescript
+// BEFORE (broken)
+return results.map(...).filter((r) => {
+  if (!r.date) return true
+  const articleDate = new Date(r.date)  // ← Invalid Date for "3 days ago"
+  return articleDate >= cutoff           // ← always false
+})
+
+// AFTER (fixed)
+return results.map((r) => ({ ... }))    // ← no second filter
 ```
 
-## Design
+---
 
-- Light/dark theme via `data-theme` on `<html>`, CSS custom properties
-- Dot-grid background pattern (same SVG dot, different opacity per theme)
-- Unified button system: `.pill-button` base + `--muted` / `--danger` semantic variants
-- Tokens tracked per-topic, displayed in card header
-- `promptUsed` removed from UI (no longer surfaced)
+## File Structure
+
+```
+src/
+├── main.ts                    # Vue app bootstrap
+├── App.vue                    # Main UI, dig orchestration
+├── style.css                  # Global styles (CSS variables, dark/light themes)
+├── assets/
+│   └── favicon.png
+├── composables/
+│   └── useTopics.ts           # Topic state + localStorage persistence
+├── services/
+│   ├── researchPipeline.ts   # 3-layer pipeline (analyze → search → synthesize)
+│   ├── searchService.ts       # Serper REST API + date parsing
+│   ├── newsApi.ts            # fetchNewsForTopic wrapper
+│   ├── geminiClient.ts       # GoogleGenAI factory
+│   └── apiKeyStore.ts        # localStorage API key CRUD
+└── types/
+    ├── topic.ts              # Topic, TopicStatus, AnswerLength
+    └── research.ts           # ResearchResult, Layer1Intelligence, SourceArticle, TokenUsage
+
+docs/                          # Built static output (GitHub Pages)
+├── index.html
+├── assets/
+│   ├── index-*.js
+│   └── index-*.css
+└── vite.svg
+```
+
+---
+
+## Environment Variables
+
+```
+VITE_GEMINI_API_KEY=your_gemini_api_key_here    # User enters via UI (not bundled)
+SERPER_API_KEY=29e9856df645a3ac5c5bcb6bdad3e582be0322fa
+VITE_SERPER_API_KEY=29e9856df645a3ac5c5bcb6bdad3e582be0322fa
+```
