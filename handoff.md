@@ -2,7 +2,7 @@
 
 ## What Exists
 
-A browser-based news intelligence app with a topic deck, 3-layer research pipeline, and zen mode.
+A browser-based news intelligence app with a topic deck, 3-layer research pipeline, token tracking, and zen mode.
 
 ## Architecture (Implemented)
 
@@ -10,14 +10,16 @@ A browser-based news intelligence app with a topic deck, 3-layer research pipeli
 
 **Layer 1 — Topic Intelligence** (`src/services/researchPipeline.ts → layer1_analyzeTopic`)
 - Model: `gemini-3-flash-preview` with `ThinkingLevel.MEDIUM`
-- Input: topic label + preferred sources + timeframe
+- Input: topic label + preferred sources + timeframe days
 - Output: `{ classification, angle, suggestedQueries[3], responseStyle, priorityFactors[2] }`
 - JSON response via `responseMimeType: 'application/json'`
+- Returns token usage metadata
 
 **Layer 2 — Source-Diversified Search** (`researchPipeline.ts → layer2_search`)
-- Model: `gemini-3-flash-preview` with `ThinkingLevel.MINIMAL`, `googleSearch: {}` tool
+- Calls `searchService.ts` which uses **Serper REST API** directly (not model tool execution)
 - Runs 3 queries in parallel via `Promise.all`
-- Extracts results from `part.googleSearchResult`
+- Serper `tbs` date filter maps timeframeDays to Google date ranges (`qdr:d/w/m/y`)
+- Client-side date guard also filters results older than the time window
 - Deduplicates by URL
 
 **Layer 3 — Structured Synthesis** (`researchPipeline.ts → layer3_synthesize`)
@@ -25,51 +27,48 @@ A browser-based news intelligence app with a topic deck, 3-layer research pipeli
 - Input: all gathered articles (up to 15) + layer 1 intelligence
 - Output: structured JSON `{ headline, classification, angle, coverage: {primary,secondary,niche}, keyFindings, implications, whatToWatch, sourceDiversityScore }`
 - Rendered as Markdown via `renderResearchAsMarkdown()`
+- Returns token usage metadata
 
-### Status States (3-layer pipeline)
+**Token Usage**: Layers 1 and 3 both return `usageMetadata { promptTokenCount, candidatesTokenCount, totalTokenCount }`. Aggregated in `runResearchPipeline()` and displayed in the UI card as `Tokens: X (Y in / Z out)`.
+
+### Status States
 
 `idle | analyzing | searching | synthesizing | success | error`
 
 Card shows status pill + "Layer N/3" progress indicator when in flight.
 
-### Entry Point
-
-- `src/services/newsApi.ts` → `fetchNewsForTopic()` wraps `runResearchPipeline()`
-- `src/App.vue` → `digSingleTopic()` calls `fetchNewsForTopic()` with `onLayerProgress` callback
-
-### API Key
-
-- Stored in localStorage via `src/services/apiKeyStore.ts`
-- Key name: `'news-center-api-key'`
-- Prompt asks user to enter via "Add API KEY" panel if missing
-
 ## File Map
 
-- `src/types/research.ts` — ResearchResult, Layer1Intelligence, SourceArticle, KeyFinding interfaces
-- `src/types/topic.ts` — Topic, TopicStatus (3-layer states), AnswerLength
-- `src/services/geminiClient.ts` — `GoogleGenAI` client factory
-- `src/services/researchPipeline.ts` — All 3 layers + `runResearchPipeline()`
-- `src/services/newsApi.ts` — `fetchNewsForTopic()` wrapper
-- `src/services/apiKeyStore.ts` — localStorage read/write
-- `src/App.vue` — UI, topic management, dig orchestration
-- `src/composables/useTopics.ts` — localStorage persistence for topics
-- `src/style.css` — All styles
+| File | Purpose |
+|------|---------|
+| `src/types/research.ts` | `ResearchResult`, `Layer1Intelligence`, `SourceArticle`, `KeyFinding`, `TokenUsage` |
+| `src/types/topic.ts` | `Topic`, `TopicStatus`, `AnswerLength` |
+| `src/services/geminiClient.ts` | `GoogleGenAI` client factory |
+| `src/services/researchPipeline.ts` | Layers 1-3 + `runResearchPipeline()` |
+| `src/services/searchService.ts` | Serper REST client, date filtering via `tbs` |
+| `src/services/newsApi.ts` | `fetchNewsForTopic()` — wraps pipeline, returns summary + tokenUsage |
+| `src/services/apiKeyStore.ts` | localStorage read/write for Gemini API key |
+| `src/composables/useTopics.ts` | Topics CRUD + localStorage persistence |
+| `src/App.vue` | UI, topic management, dig orchestration |
+| `src/style.css` | All styles, CSS custom properties for light/dark themes |
 
-## API Key Note
+## API Keys
 
-- .env holds `VITE_GEMINI_API_KEY` (optional, for fallback)
-- Primary key: user-entered via "Add API KEY" UI panel → localStorage
-- Legacy key names cleaned up
+- **Serper**: `VITE_SERPER_API_KEY` in `.env` — for Layer 2 search
+- **Gemini**: User-entered via "Add API KEY" panel → stored in localStorage as `'news-center-api-key'`
+- Both `.env` vars are build-time injected (Vite)
 
 ## Build
 
 ```bash
 cd /Users/str/Projects/news-center
-npm run build  # clean build → docs/
+pnpm build  # clean build → docs/
 ```
 
-## Next
+## Design
 
-- User needs to provide a valid Gemini API key in the UI
-- Serper removed, no longer needed anywhere
-- The `googleSearch` tool should return results inline (no manual function calling loop needed — model returns search results directly in response parts)
+- Light/dark theme via `data-theme` on `<html>`, CSS custom properties
+- Dot-grid background pattern (same SVG dot, different opacity per theme)
+- Unified button system: `.pill-button` base + `--muted` / `--danger` semantic variants
+- Tokens tracked per-topic, displayed in card header
+- `promptUsed` removed from UI (no longer surfaced)

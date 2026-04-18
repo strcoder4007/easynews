@@ -11,7 +11,6 @@ export interface Topic {
   sources: string[]
   answerLength: AnswerLength
   timeframeDays: number
-  promptUsed?: string
   lastRunAt?: string
   response?: string
   errorMessage?: string
@@ -19,5 +18,3 @@ export interface Topic {
   layerProgress?: 1 | 2 | 3
   tokenUsage?: TokenUsage
 }
-
-export type TopicUpdate = Partial<Omit<Topic, 'id' | 'createdAt'>>

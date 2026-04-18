@@ -1,5 +1,7 @@
 import { readonly, ref, watch } from 'vue'
-import type { AnswerLength, Topic, TopicStatus, TopicUpdate } from '../types/topic'
+import type { AnswerLength, Topic, TopicStatus } from '../types/topic'
+
+type TopicPatch = Partial<Omit<Topic, 'id' | 'createdAt'>>
 
 const STORAGE_KEY = 'news-center-topics'
 const hasWindow = typeof window !== 'undefined'
@@ -39,7 +41,6 @@ export function useTopics() {
       sources: normalizedSources,
       answerLength,
       timeframeDays,
-      promptUsed: undefined,
       lastRunAt: undefined,
       response: undefined,
       errorMessage: undefined,
@@ -54,7 +55,7 @@ export function useTopics() {
     topics.value = topics.value.filter((topic) => topic.id !== id)
   }
 
-  const updateTopic = (id: string, patch: TopicUpdate) => {
+  const updateTopic = (id: string, patch: TopicPatch) => {
     topics.value = topics.value.map((topic) => {
       if (topic.id !== id) return topic
       return {
@@ -149,8 +150,6 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
     typeof candidate.timeframeDays === 'number' && Number.isFinite(candidate.timeframeDays)
       ? candidate.timeframeDays
       : 7
-  const promptUsed =
-    typeof candidate.promptUsed === 'string' ? candidate.promptUsed : undefined
   return {
     id: typeof candidate.id === 'string' ? candidate.id : createId('topic'),
     label,
@@ -159,7 +158,6 @@ function normalizeTopic(candidate: Partial<Topic>): Topic | null {
     sources,
     answerLength,
     timeframeDays,
-    promptUsed,
     lastRunAt: candidate.lastRunAt,
     response: typeof candidate.response === 'string' ? candidate.response : undefined,
     errorMessage: candidate.errorMessage,

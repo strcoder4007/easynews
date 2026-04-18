@@ -296,15 +296,12 @@ const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: bo
   if (!options?.force && !topic.digEnabled) return
   updateTopic(topic.id, { status: 'analyzing', errorMessage: undefined })
   try {
-    const { summary, prompt, tokenUsage } = await fetchNewsForTopic(
+    const { summary, tokenUsage } = await fetchNewsForTopic(
       topic.label,
       topic.sources,
       topic.answerLength,
       topic.timeframeDays,
       {
-        onPromptReady: (craftedPrompt) => {
-          updateTopic(topic.id, { promptUsed: craftedPrompt })
-        },
         onLayerProgress: (layer, _detail) => {
           const statusMap: Record<1 | 2 | 3, TopicStatus> = {
             1: 'analyzing',
@@ -318,7 +315,6 @@ const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: bo
     updateTopic(topic.id, {
       status: 'success',
       response: summary,
-      promptUsed: prompt,
       tokenUsage,
       lastRunAt: new Date().toISOString(),
       errorMessage: undefined,
@@ -660,7 +656,9 @@ const formatDateTime = (value?: string) => {
                 @click.stop="removeSourceAtIndex(index)"
                 aria-label="Remove source"
               >
-                  &times;
+                  <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" width="12" height="12">
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                  </svg>
                 </button>
               </span>
               <input
@@ -919,7 +917,9 @@ const formatDateTime = (value?: string) => {
                           @click.stop="removeEditingSourceAtIndex(index)"
                           aria-label="Remove source"
                         >
-                          &times;
+                          <svg viewBox="0 0 20 20" aria-hidden="true" fill="currentColor" width="12" height="12">
+                            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                          </svg>
                         </button>
                       </span>
                       <input
@@ -1057,10 +1057,6 @@ const formatDateTime = (value?: string) => {
                   <div v-else class="topic-response" v-html="renderMarkdown(topic.response)"></div>
                 </div>
 
-                <details class="prompt-used">
-                  <summary>Prompt Used</summary>
-                  <pre class="prompt-used__body">{{ topic.promptUsed ?? 'Prompt will appear here after the next dig.' }}</pre>
-                </details>
               </template>
             </div>
           </Transition>
