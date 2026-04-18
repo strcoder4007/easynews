@@ -15,9 +15,9 @@
   --text-primary: #1a1a1a;
   --text-secondary: #6b6b6b;
   --muted: #a0a0a0;
-  --accent-start: #3b3b3b;
-  --accent-end: #3b3b3b;
-  --accent-gradient: linear-gradient(135deg, #3b3b3b, #1a1a1a);
+  --accent-start: #6366f1;
+  --accent-end: #8b5cf6;
+  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
   --accent-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   --status-warning: #facc15;
   --status-success: #22c55e;
@@ -88,6 +88,9 @@
   --text-secondary: #888888;
   --muted: #555555;
   --accent-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --accent-start: #818cf8;
+  --accent-end: #a78bfa;
+  --accent-gradient: linear-gradient(135deg, #818cf8, #a78bfa);
   --frosted: rgba(26, 26, 26, 0.85);
   --body-background: #111111;
   --surface-contrast: rgba(31, 31, 31, 0.82);
