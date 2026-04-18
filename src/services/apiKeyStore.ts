@@ -1,4 +1,4 @@
-const API_KEY_STORAGE_KEY = 'news-center-openai-api-key'
+const API_KEY_STORAGE_KEY = 'news-center-api-key'
 
 function isBrowserEnvironment(): boolean {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'

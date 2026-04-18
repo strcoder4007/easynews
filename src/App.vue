@@ -7,13 +7,12 @@ import { fetchNewsForTopic } from './services/newsApi'
 import { getStoredApiKey, saveApiKey } from './services/apiKeyStore'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import yodaIcon from './assets/yoda.png'
-import vaderIcon from './assets/vader.png'
+
 
 marked.setOptions({
   breaks: true,
 })
-const { topics, addTopic, removeTopic, updateTopic } = useTopics()
+const { topics, addTopic, removeTopic, updateTopic, mergeTopics, exportTopics } = useTopics()
 
 const topicName = ref('')
 const sourceInput = ref('')
@@ -28,6 +27,11 @@ const isTopicFormOpen = ref(false)
 const TOPIC_FORM_ID = 'topic-form-panel'
 const isApiKeyFormOpen = ref(false)
 const API_KEY_FORM_ID = 'api-key-form-panel'
+const IMPORT_EXPORT_FORM_ID = 'import-export-form-panel'
+const isImportExportOpen = computed(() => topics.value.length === 0)
+const importJsonInput = ref('')
+const importError = ref<string | null>(null)
+const importSuccess = ref<string | null>(null)
 const storedApiKey = ref<string | null>(getStoredApiKey())
 const apiKeyInput = ref('')
 const apiKeyFormError = ref<string | null>(null)
@@ -73,7 +77,6 @@ const isDarkTheme = computed(() => theme.value === 'dark')
 const themeToggleDescription = computed(() =>
   isDarkTheme.value ? 'Switch to light mode' : 'Switch to dark mode'
 )
-const themeToggleIcon = computed(() => (isDarkTheme.value ? yodaIcon : vaderIcon))
 
 watch(
   theme,
@@ -109,7 +112,9 @@ const closeZenModal = () => {
 
 const statusCopy: Record<TopicStatus, string> = {
   idle: 'Idle',
-  fetching: 'Fetching…',
+  analyzing: 'Analyzing…',
+  searching: 'Searching…',
+  synthesizing: 'Synthesizing…',
   success: 'Fetched',
   error: 'Error',
 }
@@ -180,7 +185,7 @@ const handleApiKeySubmit = () => {
   apiKeyFormError.value = null
   const candidate = apiKeyInput.value.trim()
   if (!candidate) {
-    apiKeyFormError.value = 'Please enter a valid Gemini API key.'
+    apiKeyFormError.value = 'Please enter a valid API key.'
     return
   }
   saveApiKey(candidate)
@@ -289,9 +294,9 @@ const digTopics = async () => {
 
 const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: boolean }) => {
   if (!options?.force && !topic.digEnabled) return
-  updateTopic(topic.id, { status: 'fetching', errorMessage: undefined })
+  updateTopic(topic.id, { status: 'analyzing', errorMessage: undefined })
   try {
-    const { summary, prompt } = await fetchNewsForTopic(
+    const { summary, prompt, tokenUsage } = await fetchNewsForTopic(
       topic.label,
       topic.sources,
       topic.answerLength,
@@ -300,14 +305,24 @@ const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: bo
         onPromptReady: (craftedPrompt) => {
           updateTopic(topic.id, { promptUsed: craftedPrompt })
         },
+        onLayerProgress: (layer, _detail) => {
+          const statusMap: Record<1 | 2 | 3, TopicStatus> = {
+            1: 'analyzing',
+            2: 'searching',
+            3: 'synthesizing',
+          }
+          updateTopic(topic.id, { status: statusMap[layer], layerProgress: layer })
+        },
       }
     )
     updateTopic(topic.id, {
       status: 'success',
       response: summary,
       promptUsed: prompt,
+      tokenUsage,
       lastRunAt: new Date().toISOString(),
       errorMessage: undefined,
+      layerProgress: undefined,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
@@ -316,6 +331,7 @@ const digSingleTopic = async (topic: DeepReadonly<Topic>, options?: { force?: bo
       errorMessage: message,
       response: undefined,
       lastRunAt: new Date().toISOString(),
+      layerProgress: undefined,
     })
   }
 }
@@ -360,6 +376,46 @@ const toggleApiKeyForm = () => {
   if (nextState) {
     isTopicFormOpen.value = false
   }
+}
+
+const handleImportSubmit = () => {
+  importError.value = null
+  importSuccess.value = null
+  const raw = importJsonInput.value.trim()
+  if (!raw) {
+    importError.value = 'Please paste some JSON first.'
+    return
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    importError.value = 'Invalid JSON. Check the format and try again.'
+    return
+  }
+  if (!Array.isArray(parsed)) {
+    importError.value = 'Expected a JSON array of topics.'
+    return
+  }
+  mergeTopics(parsed as Partial<Topic>[])
+  const count = (parsed as unknown[]).length
+  importSuccess.value = `${count} topics imported.`
+  importJsonInput.value = ''
+  setTimeout(() => {
+    importSuccess.value = null
+  }, 1500)
+}
+
+const handleExportClick = () => {
+  const json = exportTopics()
+  const date = new Date().toISOString().slice(0, 10)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `easynews-topics-${date}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 const handleCardClick = (topicId: string, event: MouseEvent) => {
@@ -491,7 +547,22 @@ const formatDateTime = (value?: string) => {
           @click="toggleTheme"
         >
           <span class="theme-toggle__icon" aria-hidden="true">
-            <img :src="themeToggleIcon" alt="" />
+            <!-- Sun icon (shown in dark mode → switch to light) -->
+            <svg v-if="isDarkTheme" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="4"/>
+              <line x1="12" y1="2" x2="12" y2="6"/>
+              <line x1="12" y1="18" x2="12" y2="22"/>
+              <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/>
+              <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+              <line x1="2" y1="12" x2="6" y2="12"/>
+              <line x1="18" y1="12" x2="22" y2="12"/>
+              <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/>
+              <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+            </svg>
+            <!-- Moon icon (shown in light mode → switch to dark) -->
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+            </svg>
           </span>
         </button>
         <button
@@ -499,7 +570,7 @@ const formatDateTime = (value?: string) => {
           type="button"
           :aria-controls="API_KEY_FORM_ID"
           :aria-expanded="isApiKeyFormOpen"
-          title="Toggle the panel to add or update your Gemini API key"
+          title="Toggle the panel to add or update your API key"
           @click="toggleApiKeyForm"
         >
           <span class="header-accent-text">Add API Key</span>
@@ -656,16 +727,76 @@ const formatDateTime = (value?: string) => {
       </section>
     </Transition>
 
+    <Transition name="form-collapse">
+      <section v-if="isImportExportOpen" class="card form-card" :id="IMPORT_EXPORT_FORM_ID">
+        <form class="topic-form" @submit.prevent="handleImportSubmit">
+          <div class="field-group">
+            <h3>Import / Export Topics</h3>
+          </div>
+
+          <div class="field-group">
+            <details class="sample-json-details">
+              <summary>Sample JSON</summary>
+              <pre class="sample-json-body">[
+  {
+    "label": "Technical AI Agent News",
+    "sources": [],
+    "answerLength": "medium",
+    "timeframeDays": 2,
+    "digEnabled": true
+  },
+  {
+    "label": "Toyota cars releasing in India",
+    "sources": [],
+    "answerLength": "short",
+    "timeframeDays": 7,
+    "digEnabled": true
+  },
+  {
+    "label": "Reddit Crackwatch 5 best Posts",
+    "sources": ["r/CrackWatch"],
+    "answerLength": "short",
+    "timeframeDays": 14,
+    "digEnabled": true
+  },
+  {
+    "label": "Fitgirl repack latest games",
+    "sources": [],
+    "answerLength": "short",
+    "timeframeDays": 7,
+    "digEnabled": true
+  }
+]</pre>
+            </details>
+          </div>
+
+          <div class="field-group">
+            <label for="import-json-input">Paste JSON to import</label>
+            <textarea
+              id="import-json-input"
+              v-model="importJsonInput"
+              rows="6"
+              placeholder='[{"label": "...", "sources": [...], ...}]'
+            ></textarea>
+          </div>
+
+          <p v-if="importError" class="form-error">{{ importError }}</p>
+          <p v-if="importSuccess" class="form-success">{{ importSuccess }}</p>
+
+          <div class="form-footer">
+            <button class="primary" type="submit">Import Topics</button>
+            <button class="secondary" type="button" @click="handleExportClick">Export Topics</button>
+          </div>
+        </form>
+      </section>
+    </Transition>
+
     <div v-if="!hasStoredApiKey" class="api-key-warning" role="alert">
-      No Gemini API key found. Click "Add API KEY" to enter one before digging.
+      No API key found. Click "Add API KEY" to enter one before digging.
     </div>
 
     <section class="topics-section">
-      <p v-if="topics.length === 0" class="empty-state">
-        No topics yet. Add one above and it will live in local storage.
-      </p>
-
-      <div v-else class="topic-grid">
+      <div v-if="topics.length > 0" class="topic-grid">
         <article
           v-for="topic in sortedTopics"
           :key="topic.id"
@@ -674,7 +805,7 @@ const formatDateTime = (value?: string) => {
             {
               'topic-card--collapsed': !isTopicExpanded(topic.id),
               'topic-card--expanded': isTopicExpanded(topic.id),
-              'topic-card--fetching': topic.status === 'fetching',
+              'topic-card--fetching': ['analyzing', 'searching', 'synthesizing'].includes(topic.status),
             },
           ]"
           @click="handleCardClick(topic.id, $event)"
@@ -686,11 +817,21 @@ const formatDateTime = (value?: string) => {
                 <span class="status-pill" :class="topic.status">
                   {{ statusCopy[topic.status] }}
                 </span>
+                <span v-if="topic.status !== 'idle' && topic.status !== 'success' && topic.status !== 'error'" class="layer-progress">
+                  Layer {{ topic.layerProgress }}/3
+                </span>
                 <p class="topic-last-run">
                   Last dig <strong>{{ formatDateTime(topic.lastRunAt) }}</strong>
                 </p>
                 <p class="topic-timeframe">
                   Window: last {{ topic.timeframeDays }} day{{ topic.timeframeDays === 1 ? '' : 's' }}
+                </p>
+                <p v-if="topic.tokenUsage" class="topic-token-count">
+                  Tokens: {{ topic.tokenUsage.totalTokens.toLocaleString() }}
+                  <span class="token-detail">
+                    ({{ topic.tokenUsage.promptTokens.toLocaleString() }} in
+                    / {{ topic.tokenUsage.completionTokens.toLocaleString() }} out)
+                  </span>
                 </p>
               </div>
             </div>
@@ -698,7 +839,7 @@ const formatDateTime = (value?: string) => {
               <button
                 :class="[
                   'topic-card__single-dig',
-                  { 'topic-card__single-dig--spinning': topic.status === 'fetching' },
+                  { 'topic-card__single-dig--spinning': ['analyzing', 'searching', 'synthesizing'].includes(topic.status) },
                 ]"
                 type="button"
                 :disabled="isDigging"

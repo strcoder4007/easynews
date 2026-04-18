@@ -1,100 +1,75 @@
-# news-center (EasyNews) - Project Handoff
+# Easynews — Project Handoff
 
-## 1. Project Overview
+## What Exists
 
-**EasyNews** is a browser-based AI news research tool. It creates topic decks, performs deep research with web access, and keeps all data in localStorage.
+A browser-based news intelligence app with a topic deck, 3-layer research pipeline, and zen mode.
 
-### Key Features
-- **Topic deck**: Create unlimited topics, toggle on/off, reorder by timeframe
-- **Guided digging**: AI crafts prompts from topic + guardrails, fetches web-sourced updates
-- **Web-aware output**: Responses include links, timestamps, markdown
-- **Stateful cards**: Idle/Fetching/Fetched/Error status indicators
-- **Zen Mode**: Distraction-free reading modal
+## Architecture (Implemented)
 
----
+### 3-Layer Pipeline
 
-## 2. Tech Stack
+**Layer 1 — Topic Intelligence** (`src/services/researchPipeline.ts → layer1_analyzeTopic`)
+- Model: `gemini-3-flash-preview` with `ThinkingLevel.MEDIUM`
+- Input: topic label + preferred sources + timeframe
+- Output: `{ classification, angle, suggestedQueries[3], responseStyle, priorityFactors[2] }`
+- JSON response via `responseMimeType: 'application/json'`
 
-| Layer | Technology |
-|-------|------------|
-| **Framework** | Vite + React |
-| **Build** | TypeScript |
-| **AI** | Google Gemini 2.0 Flash (via @google/generative-ai) |
-| **Search** | Google Search via Serper API |
-| **Storage** | localStorage (browser) |
-| **Styling** | (check src/) |
+**Layer 2 — Source-Diversified Search** (`researchPipeline.ts → layer2_search`)
+- Model: `gemini-3-flash-preview` with `ThinkingLevel.MINIMAL`, `googleSearch: {}` tool
+- Runs 3 queries in parallel via `Promise.all`
+- Extracts results from `part.googleSearchResult`
+- Deduplicates by URL
 
----
+**Layer 3 — Structured Synthesis** (`researchPipeline.ts → layer3_synthesize`)
+- Model: `gemini-3.1-pro-preview` with `ThinkingLevel.HIGH`
+- Input: all gathered articles (up to 15) + layer 1 intelligence
+- Output: structured JSON `{ headline, classification, angle, coverage: {primary,secondary,niche}, keyFindings, implications, whatToWatch, sourceDiversityScore }`
+- Rendered as Markdown via `renderResearchAsMarkdown()`
 
-## 3. File Structure
+### Status States (3-layer pipeline)
 
-```
-news-center/
-├── src/                  # React source code
-├── public/               # Static assets
-├── docs/                 # Documentation
-├── node_modules/
-├── package.json
-├── vite.config.ts
-├── tsconfig.json
-├── index.html
-└── README.md
-```
+`idle | analyzing | searching | synthesizing | success | error`
 
----
+Card shows status pill + "Layer N/3" progress indicator when in flight.
 
-## 4. Setup & Running
+### Entry Point
+
+- `src/services/newsApi.ts` → `fetchNewsForTopic()` wraps `runResearchPipeline()`
+- `src/App.vue` → `digSingleTopic()` calls `fetchNewsForTopic()` with `onLayerProgress` callback
+
+### API Key
+
+- Stored in localStorage via `src/services/apiKeyStore.ts`
+- Key name: `'news-center-api-key'`
+- Prompt asks user to enter via "Add API KEY" panel if missing
+
+## File Map
+
+- `src/types/research.ts` — ResearchResult, Layer1Intelligence, SourceArticle, KeyFinding interfaces
+- `src/types/topic.ts` — Topic, TopicStatus (3-layer states), AnswerLength
+- `src/services/geminiClient.ts` — `GoogleGenAI` client factory
+- `src/services/researchPipeline.ts` — All 3 layers + `runResearchPipeline()`
+- `src/services/newsApi.ts` — `fetchNewsForTopic()` wrapper
+- `src/services/apiKeyStore.ts` — localStorage read/write
+- `src/App.vue` — UI, topic management, dig orchestration
+- `src/composables/useTopics.ts` — localStorage persistence for topics
+- `src/style.css` — All styles
+
+## API Key Note
+
+- .env holds `VITE_GEMINI_API_KEY` (optional, for fallback)
+- Primary key: user-entered via "Add API KEY" UI panel → localStorage
+- Legacy key names cleaned up
+
+## Build
 
 ```bash
-cd ~/Projects/news-center
-npm install
-cp .env.example .env     # Optional (already has keys configured)
-npm run dev
+cd /Users/str/Projects/news-center
+npm run build  # clean build → docs/
 ```
 
-Access: http://localhost:5173 (default Vite port)
+## Next
 
-### Environment Variables
-```
-VITE_GEMINI_MODEL=gemini-2.0-flash-exp
-VITE_SERPER_API_KEY=your_serper_api_key_here
-```
-
----
-
-## 5. Configuration
-
-- User provides Gemini API key via UI ("Add API KEY" in header)
-- Serper API key is configured via .env (for server-side search)
-- All state persisted to browser localStorage
-- No backend required - runs entirely client-side
-
----
-
-## 6. Known Issues
-
-- Requires Gemini API key
-- Search uses Serper API (configured in .env)
-
----
-
-## 7. What a New Agent Needs to Know
-
-- Main logic in `src/` - check components for UI, services for AI calls
-- Gemini integration uses @google/generative-ai SDK
-- Search is performed via Serper API (Google search)
-- State management via localStorage - no database needed
-
----
-
-## 8. Migration Notes (March 2026)
-
-- Migrated from OpenAI Responses API to Gemini 2.0 Flash
-- Replaced OpenAI web_search tool with Serper API for Google search
-- API key storage remains in localStorage (user-provided)
-- Serper key is configured in .env file
-
----
-
-*Generated: February 21, 2026*
-*Updated: March 6, 2026*
+- User needs to provide a valid Gemini API key in the UI
+- Serper removed, no longer needed anywhere
+- The `googleSearch` tool should return results inline (no manual function calling loop needed — model returns search results directly in response parts)

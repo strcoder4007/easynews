@@ -72,6 +72,29 @@ export function useTopics() {
     topics.value = []
   }
 
+  const mergeTopics = (incoming: Partial<Topic>[]) => {
+    const toAdd: Topic[] = []
+    for (const candidate of incoming) {
+      const normalized = normalizeTopic(candidate)
+      if (!normalized) continue
+      const exists = topics.value.find((t) => t.label === normalized.label)
+      if (exists) {
+        topics.value = topics.value.map((t) =>
+          t.id === exists.id ? { ...t, ...normalized, id: t.id } : t
+        )
+      } else {
+        toAdd.push(normalized)
+      }
+    }
+    if (toAdd.length) {
+      topics.value = [...toAdd, ...topics.value]
+    }
+  }
+
+  const exportTopics = (): string => {
+    return JSON.stringify(topics.value, null, 2)
+  }
+
   return {
     topics: readonly(topics),
     addTopic,
@@ -79,6 +102,8 @@ export function useTopics() {
     updateTopic,
     replaceTopics,
     clearTopics,
+    mergeTopics,
+    exportTopics,
   }
 }
 
