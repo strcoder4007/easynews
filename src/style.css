@@ -1219,8 +1219,8 @@ button.ghost[disabled] {
 }
 
 .dig-switch__input:checked + .dig-switch__track {
-  background: var(--accent-gradient);
-  box-shadow: var(--accent-shadow);
+  background: rgba(120, 120, 120, 0.5);
+  box-shadow: none;
 }
 
 .dig-switch__input:checked + .dig-switch__track::before {
