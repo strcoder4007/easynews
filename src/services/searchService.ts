@@ -23,6 +23,36 @@ function buildTbs(timeframeDays: number): string {
 }
 
 /**
+ * Parse relative date strings like "3 days ago", "2 hours ago", "1 day ago"
+ * and return a Date object. Returns null if parsing fails.
+ */
+function parseRelativeDate(dateStr: string): Date | null {
+  const now = new Date()
+  const lower = dateStr.toLowerCase().trim()
+
+  const match = lower.match(/^(\d+)\s*(hour|day|week|month|year)s?\s*ago$/i)
+  if (!match) return null
+
+  const value = parseInt(match[1]!, 10)
+  const unit = match[2]!
+
+  switch (unit) {
+    case 'hour':
+      return new Date(now.getTime() - value * 60 * 60 * 1000)
+    case 'day':
+      return new Date(now.getTime() - value * 24 * 60 * 60 * 1000)
+    case 'week':
+      return new Date(now.getTime() - value * 7 * 24 * 60 * 60 * 1000)
+    case 'month':
+      return new Date(now.getTime() - value * 30 * 24 * 60 * 60 * 1000)
+    case 'year':
+      return new Date(now.getTime() - value * 365 * 24 * 60 * 60 * 1000)
+    default:
+      return null
+  }
+}
+
+/**
  * Execute a single search query via Serper REST API.
  * VITE_SERPER_API_KEY is injected at build time — safe for demo use.
  */
@@ -114,5 +144,16 @@ export async function searchMultipleSerper(
     }
   }
 
-  return deduped
+  // Client-side date filter: parse relative date strings ("3 days ago") and
+  // filter out anything older than the time window
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - timeframeDays)
+
+  return deduped.filter((r) => {
+    if (!r.date) return true
+    const articleDate = parseRelativeDate(r.date)
+    // If we can't parse the date, keep the result (trust Serper's tbs filter)
+    if (!articleDate) return true
+    return articleDate >= cutoff
+  })
 }
